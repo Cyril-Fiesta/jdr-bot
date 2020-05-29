@@ -123,8 +123,10 @@ async def warning(ctx,*message): #Cette commande me permet de prevenir des maint
     if ctx.author.id == My_ID:  #mon id discord
         for element in bot.guilds:
             for channel in element.channels:
-                if "jdr-bot" in str(channel):
-                    await channel.send(f'```diff\n-{message}```') #message
+                if str(channel.type) == "voice":
+                    pass
+                elif "jdr-bot" in str(channel):
+                    await channel.send(f'```diff\n-{message}```') #message (bug à corriger, le bot tente sur voicechannel)
     else:
         pass
 
