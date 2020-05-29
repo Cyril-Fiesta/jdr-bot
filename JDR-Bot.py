@@ -1,4 +1,4 @@
-# JDR-Bot 1.0 => Première version officiele distribuable du bot JDR-Bot, après 3 versions majeures en local
+# JDR-Bot 1.1 => Refontes de plusieurs fonctions, gestion de plusieurs urls, divers ajouts et corrections. Ouverture d'un GitHub
 # JDR-Bot est mise à disposition selon les termes de la Licence Creative Commons Attribution - Partage dans les Mêmes Conditions 4.0 International.
 # https://creativecommons.org/licenses/by-sa/4.0/
 
@@ -6,7 +6,7 @@ import random
 import asyncio
 import aiohttp
 import json
-# import os
+# import os A mettre si on veut tester un scénario en local.
 import typing
 import discord
 import urllib.request
@@ -22,8 +22,13 @@ from discord.voice_client import VoiceClient
 from discord.utils import get
 from discord import FFmpegPCMAudio
 
-BOT_PREFIX = ("j!", "j-")
-TOKEN = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXX"  # Get at discordapp.com/developers/applications/me
+with open('config.json', 'r') as f: #patch récent : token et id stocké sur un fichier externe
+    config = json.load(f)
+
+TOKEN = config['SECRET_TOKEN'] # Get at discordapp.com/developers/applications/me
+My_ID = config['ID_DEV'] # mon id discord
+
+BOT_PREFIX = ("j!", "j-", "J!", "J-") #patch récent : ajout de préfix
 bot = commands.Bot(command_prefix=BOT_PREFIX, case_insensitive=True)
 
 base_url = "http://cyril-fiesta.fr/jdr-bot/scenarios/"
@@ -51,7 +56,7 @@ class Rpg:
 lien = {}
 class Url:
     def __init__(self):
-        self.url_lien = ""
+        self.url_lien = []
 #lien[ctx.guild.id].variable
 
 
@@ -111,11 +116,11 @@ def in_channel(channel_name):
         return channel_name in ctx.message.channel.name
     return commands.check(predicate)
 
-@bot.command(aliases=['warn', 'maintenance'])
+@bot.command(aliases=['warn', 'maintenance']) #patch récent
 async def warning(ctx,*message): #Cette commande me permet de prevenir des maintenances, updates et restart du bot.
-    message = " ".join(message)
-    if ctx.author.id == 0000000000000000000000: #mon id discord
-        #channel = await commands.TextChannelConverter().convert(ctx, str("jdr-bot"))
+    """Réservée au developpeur du bot. Informe des maintenances, rédemarrages et mises à jour."""
+    message = " ".join(message).replace('+n+', '\n')
+    if ctx.author.id == My_ID:  #mon id discord
         for element in bot.guilds:
             for channel in element.channels:
                 if "jdr-bot" in str(channel):
@@ -123,51 +128,91 @@ async def warning(ctx,*message): #Cette commande me permet de prevenir des maint
     else:
         pass
 
+def charger_url(ctx): #patch récent  on charge les url de base et de la description.
+    global base_url
+    
+    if ctx.guild.id not in lien:
+        lien[ctx.guild.id] = Url()
+   
+    if base_url not in lien[ctx.guild.id].url_lien:
+        lien[ctx.guild.id].url_lien.append(base_url)
+        
+    topic = ctx.message.channel.topic.replace('\n',' ').lower().split(" ")
+    for element in topic:
+        url = ""
+        if element.startswith("http:"):
+            url = element
+            if url.endswith("/") is False:
+                url += "/"
+            if url not in lien[ctx.guild.id].url_lien:
+                lien[ctx.guild.id].url_lien.append(url)
+
 @bot.command(aliases=['url', 'lien', 'link'])
 @commands.guild_only()
 @in_channel('jdr-bot')
-async def lien_jdr(ctx,lien_scenarios = "..."):
+async def lien_jdr(ctx,action = "...", lien_scenarios = "..."): #patch récent : refonte de la fonction pour gérer plusieurs urls
     """Affiche ou Modifie l'url où se trouve les scénarios."""
     global base_url
+    charger_url(ctx)
+    
+    lien_scenarios = lien_scenarios.lower()
+    if lien_scenarios.endswith("/") is False:
+        lien_scenarios += "/"
     authorperms = ctx.author.permissions_in(ctx.channel)
-    if ctx.guild.id not in lien:
-        lien[ctx.guild.id] = Url()
-        lien[ctx.guild.id].url_lien = base_url
-    if lien_scenarios == "..." or authorperms.manage_channels is False:
-        await ctx.send(f'```fix\nL\'url actuelle des scénarios est : {lien[ctx.guild.id].url_lien}```')
-    elif lien_scenarios == "default" or lien_scenarios == "base":
-        lien[ctx.guild.id].url_lien = base_url
-        await ctx.send(f'```fix\nL\'url des scénarios est désormais : {lien[ctx.guild.id].url_lien}```')
+    
+    if action == "..." or action == "liste" or action == "list" or authorperms.manage_channels is False:
+        liste_url = []
+        liste_url.append("Liste d\'url de scénarios :\n")
+        for element in lien[ctx.guild.id].url_lien:
+            liste_url.append(str(element)+"\n")
+        liste = ''.join(liste_url)
+        await ctx.send(f'```fix\n{liste}```')
+    elif action == "default" or action == "base" or action == "reset":
+        lien[ctx.guild.id].url_lien = [base_url]
+        await ctx.send(f'```fix\nL\'url des scénarios est désormais : {lien[ctx.guild.id].url_lien[0]}```')
+    elif action == "add" or action == "ajouter":
+        if lien_scenarios.startswith("http"):
+            if lien_scenarios not in lien[ctx.guild.id].url_lien:
+                lien[ctx.guild.id].url_lien.append(lien_scenarios)
+                await ctx.send(f'```fix\nL\'url est ajoutée à JDR-Bot.```')
+            else:
+                await ctx.send(f'```fix\nL\'url est déjà prise en compte par JDR-Bot.```')
+        else:
+            await ctx.send(f'```fix\nMerci d\'indiquer une url correcte.```')
+    elif action == "retirer" or action == "remove":
+        if lien_scenarios in lien[ctx.guild.id].url_lien:
+            lien[ctx.guild.id].url_lien.remove(lien_scenarios)
+            await ctx.send(f'```fix\nL\'url est retirée de JDR-Bot.```')
+        else:
+            await ctx.send(f'```fix\nCette url n\'est pas présente dans JDR-Bot.```')
     else :
-        if lien_scenarios.endswith("/") is False:
-            lien_scenarios += "/"
-        lien[ctx.guild.id].url_lien = lien_scenarios
-        await ctx.send(f'```fix\nL\'url des scénarios est désormais : {lien[ctx.guild.id].url_lien}```')
+        await ctx.send(f'```fix\n Merci de spécifier une action correcte ("ajouter", "base", "liste" ou "retirer")```')
 
 @bot.command(aliases=['scenario', 'scenarios','script','scripts','list_scripts'])
 @commands.guild_only()
 @in_channel('jdr-bot')
-async def liste_scenarios(ctx):
-    if ctx.guild.id not in lien:
-        url = base_url
-    else:
-        url = lien[ctx.guild.id].url_lien
-    page = requests.get(url).text
-    soup = BeautifulSoup(page,'html.parser')
-    liste_scenario = []
-    for node in soup.find_all('a'):
-        if node.get('href').endswith('.txt'):
-            liste_scenario.append(node.get('href'))
-    liste_scenario = "\n".join(liste_scenario)
-    await ctx.send(f'```fix\n{liste_scenario}```')
+async def liste_scenarios(ctx): #patch récent : la fonction vérifie maintenant chaque url.
+    charger_url(ctx)
+    for url in lien[ctx.guild.id].url_lien:
+        try:
+            page = requests.get(url).text
+            soup = BeautifulSoup(page,'html.parser')
+            liste = ["Liste de scénarios de : ",url,"\n"]
+            for node in soup.find_all('a'):
+                if node.get('href').endswith('.txt'):
+                    liste.append(node.get('href')+"\n")
+            liste = ''.join(liste)
+            await ctx.send(f'```fix\n{liste}```')
+        except:
+            pass
 
-def lire_variable(ctx, texte):
+def lire_variable(ctx, texte): #remplace v_variable par la valeur de variable
     texte = str(texte)
     for element in jeu[ctx.guild.id].variables.keys():
         texte = texte.replace('v_'+element,str(jeu[ctx.guild.id].variables[element]))
     return texte
     
-async def envoyer_texte(ctx, texte):
+async def envoyer_texte(ctx, texte): #Convertit les liens images et sons dans le texte, ainsi que le formattage.
     """Envoyer le texte sur discord après avoir séparé les images et les sons"""
     texte = lire_variable(ctx, texte)
     texte = texte.replace("[[","|-*[[")
@@ -181,7 +226,7 @@ async def envoyer_texte(ctx, texte):
         if element.startswith("[[") is True: #afficher l'élément sans markdown fix.
             element = element.replace("[[","")
             await ctx.send(f'{element}')
-        elif element.startswith("<<") is True :   #faire un test is_playing() is True => arrêt du son, puis diffusion du nouveau.
+        elif element.startswith("<<") is True : 
             element = element.replace("<<","")
             voice = get(bot.voice_clients, guild=ctx.guild)
             try:
@@ -200,7 +245,7 @@ async def envoyer_texte(ctx, texte):
         elif element != "":
             await ctx.send(f'```fix\n{element}```')
     
-async def verifier_objets(ctx):
+async def verifier_objets(ctx): #Verifie les objets, variables et conditions présents dans une salle
     valeur = ""
     changement = 0
     if jeu[ctx.guild.id].objet[jeu[ctx.guild.id].emplacement][0] != "|" :
@@ -238,7 +283,7 @@ async def verifier_objets(ctx):
                 if jeu[ctx.guild.id].objet[jeu[ctx.guild.id].emplacement][3+(o*5)] != "null" and changement == 1:
                     await envoyer_texte(ctx,jeu[ctx.guild.id].objet[jeu[ctx.guild.id].emplacement][3+(o*5)])
 
-async def condition_acces(ctx,case_actuelle,code="0"):
+async def condition_acces(ctx,case_actuelle,code="0"): #Vérifie si les conditions d'accès à une salle sont respectées
     test = 2
     test_code = 0
     for objet_test in case_actuelle:  #on vérifie pour chaque objet requis et code
@@ -316,7 +361,7 @@ async def condition_acces(ctx,case_actuelle,code="0"):
                             break
                     else:
                         test = 2
-                        print(f'```fix\n{objet_test} est incorrect```')
+                        await ctx.send(f'```fix\n{objet_test} est incorrect```')
                         break
                 except:
                     await ctx.send(f'```fix\nLe scénario comporte une syntaxe incorrecte : probablement une variable qui n\'existe pas.```')
@@ -330,68 +375,67 @@ async def condition_acces(ctx,case_actuelle,code="0"):
                     test = 1
     return test
     
-async def verifier_cases_speciales(ctx,code="0"):
-    i = 0
-    for m in jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement]:
-        if isinstance(jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i],int):
-            i += 1
-        elif jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][0] == 997:
-            if jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][1] == "null" or await condition_acces(ctx,jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][1],code) == 1:
+async def verifier_cases_speciales(ctx,code="0"): #patch récent : refonte de la fonction pour vérifier toutes les cases spéciales
+    for case_verifiee in jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement]:
+        if isinstance(case_verifiee,int):
+            pass
+        elif case_verifiee[0] == 997:
+            if case_verifiee[1] == "null" or await condition_acces(ctx,case_verifiee[1],code) == 1:
                 try:
-                    temporaire = jeu[ctx.guild.id].emplacement
-                    jeu[ctx.guild.id].emplacement = int(jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][2])-1
-                    jeu[ctx.guild.id].emplacement_precedent = temporaire
-                    if jeu[ctx.guild.id].case[temporaire][i][3] != "null":
-                        await envoyer_texte(ctx,jeu[ctx.guild.id].case[temporaire][i][3])
+                    temporaire = case_verifiee[3] #on garde de coté le texte de la case si y'a pas d'erreur
+                    jeu[ctx.guild.id].emplacement_precedent = jeu[ctx.guild.id].emplacement
+                    jeu[ctx.guild.id].emplacement = int(case_verifiee[2])-1
+                    if temporaire != "null": #pas d'erreur (except) ni de texte null, on envoit
+                        await envoyer_texte(ctx,temporaire)
                     if jeu[ctx.guild.id].texte[jeu[ctx.guild.id].emplacement] != "null":
                         await envoyer_texte(ctx,jeu[ctx.guild.id].texte[jeu[ctx.guild.id].emplacement])
                     await verifier_objets(ctx)
                     await verifier_cases_speciales(ctx,code)
                     break
                 except ValueError:
-                    if jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][2] == "null":
-                        if jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][3] != "null":
-                            await envoyer_texte(ctx,jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][3])
-                    elif "&&" in jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][2]:
+                    if case_verifiee[2] == "null":
+                        if case_verifiee[3] != "null":
+                            await envoyer_texte(ctx,case_verifiee[3])
+                    elif "&&" in case_verifiee[2]:
                         try:
-                            objet_temp = jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][2].split("&&")
+                            objet_temp = case_verifiee[2].split("&&")
                             jeu[ctx.guild.id].description[objet_temp[0]] = objet_temp[2]
                             if objet_temp[1] == "inventaire":
                                 if objet_temp[0][0] == "-" and objet_temp[0][1:] in jeu[ctx.guild.id].inventaire_en_cours:
                                     jeu[ctx.guild.id].inventaire_en_cours.remove(objet_temp[0][1:])
-                                    if jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][3] != "null":
-                                        await envoyer_texte(ctx,jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][3])
+                                    if case_verifiee[3] != "null":
+                                        await envoyer_texte(ctx,case_verifiee[3])
                                 elif objet_temp[0][0] != "-" and objet_temp[0] not in jeu[ctx.guild.id].inventaire_en_cours:
                                     jeu[ctx.guild.id].inventaire_en_cours.append(objet_temp[0])
-                                    if jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][3] != "null":
-                                        await envoyer_texte(ctx,jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][3])
+                                    if case_verifiee[3] != "null":
+                                        await envoyer_texte(ctx,case_verifiee[3])
                                 else:
                                     pass  #s'il n'y a pas de changement, on ignore le 997, contrairement à !prendre qui affiche un texte
-                            elif objet_temp[1] == "invisible": #patch récent
+                            elif objet_temp[1] == "invisible": 
                                 if objet_temp[0][0] == "-" and objet_temp[0][1:] in jeu[ctx.guild.id].inventaire_invisible:
                                     jeu[ctx.guild.id].inventaire_invisible.remove(objet_temp[0][1:])
-                                    if jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][3] != "null":
-                                        await envoyer_texte(ctx,jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][3])
+                                    if case_verifiee[3] != "null":
+                                        await envoyer_texte(ctx,case_verifiee[3])
                                 elif objet_temp[0][0] != "-" and objet_temp[0] not in jeu[ctx.guild.id].inventaire_invisible:
                                     jeu[ctx.guild.id].inventaire_invisible.append(objet_temp[0])
-                                    if jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][3] != "null":
-                                        await envoyer_texte(ctx,jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][3])
+                                    if case_verifiee[3] != "null":
+                                        await envoyer_texte(ctx,case_verifiee[3])
                                 else:
                                     pass  #s'il n'y a pas de changement, on ignore le 997, contrairement à !prendre qui affiche un texte
-                            elif objet_temp[1] == "variable": #patch récent
+                            elif objet_temp[1] == "variable": 
                                 jeu[ctx.guild.id].variables[objet_temp[0]] = int(objet_temp[2])
                                 jeu[ctx.guild.id].variables_description[objet_temp[0]] = str(objet_temp[3])
-                                if jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][3] != "null":
-                                    await envoyer_texte(ctx,jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][3])
+                                if case_verifiee[3] != "null":
+                                    await envoyer_texte(ctx,case_verifiee[3])
                         except:
                             pass
                     else:
                         try:
                             valeur = ""
-                            variable_modifiee = jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][2].split(".")
+                            variable_modifiee = case_verifiee[2].split(".")
                             if not isinstance(variable_modifiee[2],int):
                                 variable_modifiee[2] = lire_variable(ctx, variable_modifiee[2])
-                            if variable_modifiee[0] not in jeu[ctx.guild.id].variables:    #patch récent
+                            if variable_modifiee[0] not in jeu[ctx.guild.id].variables:   
                                 jeu[ctx.guild.id].variables[variable_modifiee[0]] = 0
                                 jeu[ctx.guild.id].variables_description[variable_modifiee[0]] = "..."
                             if "%" in variable_modifiee[2]:
@@ -404,18 +448,29 @@ async def verifier_cases_speciales(ctx,code="0"):
                                 jeu[ctx.guild.id].variables[variable_modifiee[0]] = int(valeur[1:])
                             else:
                                 jeu[ctx.guild.id].variables[variable_modifiee[0]] = jeu[ctx.guild.id].variables[variable_modifiee[0]] + int(valeur)
-                            if jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][3] != "null":
-                                await envoyer_texte(ctx,jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][3])
+                            if case_verifiee[3] != "null":
+                                await envoyer_texte(ctx,case_verifiee[3])
                         except:
-                            await ctx.send(f'```fix\nErreur [002] dans la variable {jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][0]} et sa valeur ajoutée {jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][2]}```')
-                except IndexError: #patch récent
+                            await ctx.send(f'```fix\nErreur [002] dans la variable {case_verifiee[0]} et sa valeur ajoutée {case_verifiee[2]}```')
+                except IndexError: 
                     await ctx.send(f'```fix\nLe scénario comporte une syntaxe incorrecte : probablement une erreur dans le nombre de salles.```')
                     break
-                i += 1
             else:
-                i +=1
+                pass
+        elif case_verifiee[0] == 999 or case_verifiee[0] == 998: #patch récent ajout des 998 et 999 dans la fonction
+            if case_verifiee[1] != "null":
+                await envoyer_texte(ctx,case_verifiee[1])
+            await asyncio.sleep(2)
+            del jeu[ctx.guild.id]
+            try: 
+                voice = get(bot.voice_clients, guild=ctx.guild)
+                if voice.is_playing():
+                    voice.stop()
+                await voice.disconnect()
+            except:
+                pass
         else:
-            i += 1
+            pass
 
 @bot.command(aliases=['roll', 'dice', 'dices', 'des', 'lancer_des'])        
 async def jeter_des(ctx,*args):
@@ -503,7 +558,7 @@ async def jeter_des(ctx,*args):
                 nb_reussite_total += nb_reussite
         resultat.append("total : "+str(total)+" (dés + "+str(valeur_ajoutee)+") ")
         if reussite > 0:
-            resultat.append("(Nombre de réussites total : "+str(nb_reussite_total)+")")
+            resultat.append("(Nombre de réussites totales : "+str(nb_reussite_total)+")")
     except (ValueError, IndexError) :
         await ctx.send(f'```fix\nErreur dans les paramètres. exemple : !jeter_des 2d6  pour 2 dés de 6 faces```')
     else:
@@ -546,21 +601,41 @@ async def jouer(ctx,nom_scenario="...") :
     n = 0
 
     jeu[ctx.guild.id] = Rpg()
-    # path = os.getcwd() + "\scenarios";
+    # path = os.getcwd() + "\scenarios"; #pour test en local
+    charger_url(ctx)
+    
     try: # ouvre le scénario 
         
         #à partir d'un dossier local
         # with open(os.path.join(path, nom_scenario), 'r') as data:
             # jeu[ctx.guild.id].scenario = data.readlines()
         
-        # à partir d'une url   
-        if ctx.guild.id not in lien:
-            data = urllib.request.urlopen(base_url+nom_scenario).read().decode('utf-8')
-        else:
-            data = urllib.request.urlopen(lien[ctx.guild.id].url_lien+nom_scenario).read().decode('utf-8')
+        # à partir d'une url    #patch récent : gestion des urls multiples
+        url_actuelle = ""
+        for url in lien[ctx.guild.id].url_lien: #On vérifie si le scénario existe, url par url.
+            try: 
+                page = requests.get(url).text
+                soup = BeautifulSoup(page,'html.parser')
+                liste = []
+                for node in soup.find_all('a'):
+                    if node.get('href').endswith('.txt'):
+                        liste.append(node.get('href'))
+                liste2 = [x.lower() for x in liste]
+                nom_scenario_l = nom_scenario.lower()
+                position = 0
+                if nom_scenario_l in liste2:
+                    url_actuelle = url
+                    position = liste2.index(nom_scenario_l)
+                    nom_scenario = liste[position]
+                    break
+            except: #si l'url est incorrecte, on passera à la suivante
+                pass
+        data = urllib.request.urlopen(url_actuelle+nom_scenario).read().decode('utf-8') # utf-8 pour remote files, ANSI pour locales files
         data = data.replace("\n","/n\n").split("\n")
         jeu[ctx.guild.id].scenario = [x.replace("/n","\n") for x in data]
-    except: # gérer l'erreur
+        
+        
+    except: # gérer l'erreur : le scénario n'a pas été trouvé sur une des url ou son nom est incorrect.
         await ctx.send(f'```fix\nLe scénario : "{nom_scenario}" n\'existe pas !```')
         del jeu[ctx.guild.id]
         return
@@ -630,7 +705,7 @@ async def jouer(ctx,nom_scenario="...") :
                     j+=1
                 elif int(jeu[ctx.guild.id].scenario[i+j][0]) == 998 or int(jeu[ctx.guild.id].scenario[i+j][0]) == 999:
                     end = []
-                    end.append(jeu[ctx.guild.id].scenario[i+j][0])
+                    end.append(int(jeu[ctx.guild.id].scenario[i+j][0])) #patch récent
                     jeu[ctx.guild.id].scenario[i+j][1] = jeu[ctx.guild.id].scenario[i+j][1].rstrip().replace('+n+', '\n')
                     end.append(jeu[ctx.guild.id].scenario[i+j][1])
                     direction.append(end)
@@ -656,24 +731,7 @@ async def jouer(ctx,nom_scenario="...") :
         
         i = 0
         jeu[ctx.guild.id].nom_salle = [x.lower() for x in jeu[ctx.guild.id].nom_salle]
-        
-        for n in jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement]:
-                if isinstance(n,int):
-                    pass
-                else:
-                    if n[0] == "999" or n[0] == "998":
-                        if n[1] != "null":
-                            await envoyer_texte(ctx,n[1])
-                        await asyncio.sleep(2)
-                        del jeu[ctx.guild.id]
-                        try: 
-                            voice = get(bot.voice_clients, guild=ctx.guild)
-                            if voice.is_playing():
-                                voice.stop()
-                            await voice.disconnect()
-                        except:
-                            pass    
-        
+        #patch récent : déplacement de la gestion des cases 998 et 999
     except:
             await ctx.send(f'```fix\nLe scénario : "{nom_scenario}" comporte une syntaxe incorrecte.```')
             del jeu[ctx.guild.id]
@@ -685,7 +743,7 @@ async def jouer(ctx,nom_scenario="...") :
             except:
                 pass
 
-@bot.command(aliases=['av', 'move', 'go'])
+@bot.command(aliases=['av', 'move', 'go', 'do', 'action'])
 @commands.guild_only()  
 @in_channel('jdr-bot')
 async def avancer(ctx,choix="...",code="0") : 
@@ -742,23 +800,7 @@ async def avancer(ctx,choix="...",code="0") :
             await verifier_objets(ctx) #regarder si il y a des objets/conditions invisibles ou des variables
                 
             await verifier_cases_speciales(ctx,code)
-                
-            for n in jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement]:
-                if isinstance(n,int):
-                    pass
-                else:
-                    if n[0] == "999" or n[0] == "998":
-                        if n[1] != "null":
-                            await envoyer_texte(ctx,n[1])
-                        await asyncio.sleep(2)
-                        del jeu[ctx.guild.id]
-                        try: 
-                            voice = get(bot.voice_clients, guild=ctx.guild)
-                            if voice.is_playing():
-                                voice.stop()
-                            await voice.disconnect()
-                        except:
-                            pass    
+            #patch récent : déplacement de la gestion des cases 998 et 999   
         elif test != 2:
             await ctx.send(f'```fix\nChoix impossible !```')
 
@@ -790,22 +832,7 @@ async def prendre(ctx,objet_cible="...") :
                     await envoyer_texte(ctx,jeu[ctx.guild.id].objet[jeu[ctx.guild.id].emplacement][3+(i*5)])
                     
                 await verifier_cases_speciales(ctx,code="0") #prendre un objet reverifie et redéclenche les 997 comme lors de l'entrée dans une salle.
-                
-                for n in jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement]: #comme on revérifie les case spéciales, on a peux-être avancer d'une case, et donc on revérifie les 998/999
-                    if isinstance(n,int):
-                        pass
-                    else:
-                        if n[0] == "999" or n[0] == "998":
-                            if n[1] != "null":
-                                await envoyer_texte(ctx,n[1])
-                            del jeu[ctx.guild.id]
-                            try: 
-                                voice = get(bot.voice_clients, guild=ctx.guild)
-                                if voice.is_playing():
-                                    voice.stop()
-                                await voice.disconnect()
-                            except:
-                                pass
+                #patch récent : déplacement de la gestion des cases 998 et 999
             else:
                 await ctx.send(f'```fix\nVous possédez déjà l\'objet \"{objet_cible}\".```')
         elif objet_cible == "...":
@@ -836,7 +863,7 @@ async def examiner(ctx,cible="ici") :
                 break
 
         if cible == "ici":
-            await ctx.send(f'```fix\n{lire_variable(ctx, jeu[ctx.guild.id].texte[jeu[ctx.guild.id].emplacement])}```')
+            await envoyer_texte(ctx, jeu[ctx.guild.id].texte[jeu[ctx.guild.id].emplacement]) #patch récent : ajout de la gestion des sons
         elif cible == "invisible" or cible == "variable" or cible[0] == "-" or cible == "null":
             await ctx.send(f'```fix\nC\'est impossible !```')
         elif cible in jeu[ctx.guild.id].variables:
@@ -872,22 +899,7 @@ async def modifier(ctx, variable, valeur):
                     await ctx.send(f'```fix\nC\'est noté, {variable} = {valeur}.```')
                     
                     await verifier_cases_speciales(ctx,code="0") #modifier une variable reverifie et redéclenche les 997 comme lors de l'entrée dans une salle.
-                    #patch récent :
-                    for n in jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement]: #comme on revérifie les case spéciales, on a peux-être avancer d'une case, et donc on revérifie les 998/999
-                        if isinstance(n,int):
-                            pass
-                        else:
-                            if n[0] == "999" or n[0] == "998":
-                                if n[1] != "null":
-                                    await envoyer_texte(ctx,n[1])
-                                del jeu[ctx.guild.id]
-                                try: 
-                                    voice = get(bot.voice_clients, guild=ctx.guild)
-                                    if voice.is_playing():
-                                        voice.stop()
-                                    await voice.disconnect()
-                                except:
-                                    pass
+                    #patch récent : déplacement de la gestion des cases 998 et 999
                                     
                 else:
                     await ctx.send(f'```fix\nCette variable n\'est pas modifiable manuellement.```')
@@ -955,8 +967,7 @@ async def abandonner(ctx):
     except:
         pass
 
-
-# @bot.command()
+# @bot.command()  #Commande modifiable pour tout type de tests pendant le dev
 # @commands.guild_only()   
 # @in_channel('jdr-bot')async def debug(ctx,texte=""):
     # """Information de debug"""
@@ -967,7 +978,6 @@ async def abandonner(ctx):
     #    await ctx.send(f'```fix\n{jeu[ctx.guild.id].variables} ET {jeu[ctx.guild.id].variables_description}```')
     #else:
     #    await ctx.send(f'```fix\nIl n\'y a pas de partie en cours !```')
-
 
 @bot.command(aliases=['info','information','infos','documentation', 'doc', 'fonctionnement'])
 async def faq(ctx):
