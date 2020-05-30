@@ -139,15 +139,18 @@ def charger_url(ctx): #patch récent  on charge les url de base et de la descrip
     if base_url not in lien[ctx.guild.id].url_lien:
         lien[ctx.guild.id].url_lien.append(base_url)
         
-    topic = ctx.message.channel.topic.replace('\n',' ').lower().split(" ")
-    for element in topic:
-        url = ""
-        if element.startswith("http:"):
-            url = element
-            if url.endswith("/") is False:
-                url += "/"
-            if url not in lien[ctx.guild.id].url_lien:
-                lien[ctx.guild.id].url_lien.append(url)
+    try: #patch récent
+        topic = ctx.message.channel.topic.replace('\n',' ').lower().split(" ")
+        for element in topic:
+            url = ""
+            if element.startswith("http:"):
+                url = element
+                if url.endswith("/") is False:
+                    url += "/"
+                if url not in lien[ctx.guild.id].url_lien:
+                    lien[ctx.guild.id].url_lien.append(url)
+    except:
+        pass
 
 @bot.command(aliases=['url', 'lien', 'link'])
 @commands.guild_only()
@@ -607,6 +610,9 @@ async def jouer(ctx,nom_scenario="...") :
     charger_url(ctx)
     
     try: # ouvre le scénario 
+        
+        if nom_scenario.lower().endswith(".txt") is False: #patch récent
+            nom_scenario += ".txt"
         
         #à partir d'un dossier local
         # with open(os.path.join(path, nom_scenario), 'r') as data:
