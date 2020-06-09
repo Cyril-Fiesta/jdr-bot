@@ -1,4 +1,4 @@
-# JDR-Bot 1.2 => voir https://github.com/Cyril-Fiesta/jdr-bot/releases/tag/1.2 
+# JDR-Bot 1.2 => voir https://github.com/Cyril-Fiesta/jdr-bot/releases/tag/1.2  
 # JDR-Bot est mise à disposition selon les termes de la Licence Creative Commons Attribution - Partage dans les Mêmes Conditions 4.0 International.
 # https://creativecommons.org/licenses/by-sa/4.0/
 
