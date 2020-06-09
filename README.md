@@ -11,7 +11,7 @@ Pour les détails complets sur l'utilisation du Bot, merci de lire [la documenta
 
 Je remercie ceux qui soutiennent le projet, en partulier : 
 
-* [L’union des Rôlistes](http://ur.virtuaJdR.net/) (Leur discord est très accueillant ! Et des auteurs travaillent actuellement sur des scénarios pour JDR-Bot)
+* [L’union des Rôlistes](http://UnionRolistes.fr/) (Leur discord est très accueillant ! Et des auteurs travaillent actuellement sur des scénarios pour JDR-Bot)
 * [VirtualJDR](https://www.virtuajdr.net/) (discord très accueillant aussi)
 * [Ludinn](https://twitter.com/Ludinn_) (vidéo twitch, youtube, discord)
 * Et d’autres partenaires divers (discord, forum, site, etc.)    
