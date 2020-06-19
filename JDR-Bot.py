@@ -1,4 +1,3 @@
-# JDR-Bot 1.2 => voir https://github.com/Cyril-Fiesta/jdr-bot/releases/tag/1.2  
 # JDR-Bot est mise à disposition selon les termes de la Licence Creative Commons Attribution - Partage dans les Mêmes Conditions 4.0 International.
 # https://creativecommons.org/licenses/by-sa/4.0/
 
@@ -6,7 +5,7 @@ import random
 import asyncio
 import aiohttp
 import json
-# import os A mettre si on veut tester un scénario en local.
+# import os #A mettre si on veut tester un scénario en local.
 import typing
 import discord
 import urllib.request
@@ -34,8 +33,10 @@ My_ID = config['ID_DEV'] # mon id discord
 def get_prefix(bot, message):
     with open('prefixes.json', 'r') as f: 
         prefixes = json.load(f)
-    
-    return prefixes[str(message.guild.id)]
+    if message.guild is None:
+        return ("j!","J!")
+    else:
+        return prefixes[str(message.guild.id)]
 
 bot = commands.Bot(command_prefix=get_prefix, case_insensitive=True)
 
@@ -45,13 +46,13 @@ start_time = time.time()
 jeu = {}
 class Rpg:
     def __init__(self):
+        self.markdown = ""
         self.inventaire_en_cours = []
         self.inventaire_invisible = []
         self.numero = []
         self.nom_salle = []
         self.texte = []
         self.objet = []
-        self.objet_requis = []
         self.case = []
         self.emplacement = 0
         self.emplacement_precedent = 0
@@ -60,6 +61,14 @@ class Rpg:
         self.variables = {"resultat" : 0,"valeur" : 0}
         self.variables_description = {"resultat" : "Résultat de ... quelque chose !", "valeur" : "Valeur de ... quelque chose !", "reponse" : "Réponse à une question ..."}
         self.nb_objets = []
+        self.salle_react = []
+        self.objetpr_react = []
+        self.objetex_react = []
+        self.meubleex_react = []
+        self.event_react = []
+        self.objet_reaction = {} #Lie chaque reaction a l'objet correspondant
+        self.salle_reaction = {} #Lie chaque réaction à la salle correspondante
+        self.last_reaction = ""
 #jeu[ctx.guild.id].variable
 
 lien = {}
@@ -114,6 +123,57 @@ async def on_guild_remove(guild):
     with open('prefixes.json', 'w') as f: 
         json.dump(prefixes, f, indent=4)
 
+@bot.event
+async def on_reaction_add(reaction, user):
+    ctx = await bot.get_context(reaction.message)
+    if reaction.message.guild.id not in jeu or str(user) == "JDR-Bot#5773":
+        pass
+    else:
+        try : #Si l'objet est déjà pris on aura un ValueError si on examine le meuble.            
+            if reaction.emoji in jeu[reaction.message.guild.id].salle_react:
+                await avancer(ctx,str(jeu[reaction.message.guild.id].salle_react.index(reaction.emoji)+1),0)
+            
+            else:
+                for cle in jeu[reaction.message.guild.id].objet_reaction:
+                    if reaction.emoji in jeu[reaction.message.guild.id].objet_reaction[cle]:
+                        objet = cle
+                        if objet in jeu[ctx.guild.id].objet[jeu[reaction.message.guild.id].emplacement]:
+                            meuble = jeu[ctx.guild.id].objet[jeu[reaction.message.guild.id].emplacement].index(objet) + 1
+                        else:
+                            meuble = "???"
+                        break
+                if reaction.emoji in jeu[reaction.message.guild.id].meubleex_react and reaction.emoji in jeu[reaction.message.guild.id].salle_reaction[str(jeu[reaction.message.guild.id].emplacement)]:
+                    if isinstance(meuble,int):
+                        await examiner(ctx, jeu[ctx.guild.id].objet[jeu[reaction.message.guild.id].emplacement][meuble])
+                    else:
+                        await examiner(ctx,"objet_inconnu...")
+                elif reaction.emoji in jeu[reaction.message.guild.id].objetex_react and reaction.emoji in jeu[reaction.message.guild.id].salle_reaction[str(jeu[reaction.message.guild.id].emplacement)]:
+                    await examiner(ctx, objet)
+                
+                elif reaction.emoji in jeu[reaction.message.guild.id].objetpr_react and reaction.emoji in jeu[reaction.message.guild.id].salle_reaction[str(jeu[reaction.message.guild.id].emplacement)]:
+                    await prendre(ctx, objet)
+                        
+                elif reaction.emoji in jeu[reaction.message.guild.id].salle_reaction[str(jeu[reaction.message.guild.id].emplacement)]:
+                    i = 0
+                    for element in jeu[reaction.message.guild.id].event_react:
+                        if reaction.emoji in element[1]:
+                            verification = []
+                            for objet in element[1]:
+                                verification.append(objet)
+                            pos = verification.index(reaction.emoji)
+                            verification[pos] = "§"
+                            if await condition_acces(ctx,verification,code="0") == 1 and element[0] > 0:
+                                await executer_event(ctx,0,element)
+                                jeu[reaction.message.guild.id].event_react[i][0] -= 1
+                            else:
+                                if element[4] != "null":
+                                    await envoyer_texte(ctx,element[4])
+                            break
+                        i += 1
+                        
+        except:
+            pass
+        
 @bot.command(aliases=['prefix', 'change_prefix'])
 @commands.guild_only()
 @commands.has_permissions(manage_channels=True)
@@ -164,7 +224,6 @@ async def on_command_error(ctx, error):
             if str(ctx.command) == "setprefix":
                 return await ctx.send(f'```fix\nLa commande {ctx.command} n\'est utilisable que si vous avez l\'autorisation de gérer les salons.```')
             else:
-                print(ctx.command)
                 return await ctx.send(f'```fix\nLa commande {ctx.command} n\'est utilisable que dans le channel "jdr-bot".```')
                 
         elif isinstance(error, commands.BadArgument):
@@ -269,6 +328,7 @@ async def lien_jdr(ctx,action = "...", lien_scenarios = "..."):
 @in_channel('jdr-bot')
 async def liste_scenarios(ctx):
     charger_url(ctx)
+    liste_existante = 0
     for url in lien[ctx.guild.id].url_lien:
         try:
             page = requests.get(url).text
@@ -277,8 +337,34 @@ async def liste_scenarios(ctx):
             for node in soup.find_all('a'):
                 if node.get('href').endswith('.txt'):
                     liste.append(node.get('href')+"\n")
-            liste = ''.join(liste)
-            await ctx.send(f'```fix\n{liste}```')
+            for element in liste:
+                if "liste_scenarios" in element:
+                    liste_existante = 1
+            if liste_existante == 1:
+                try:
+                    liste_embed = urllib.request.urlopen(url+"liste_scenarios.txt").read().decode('utf-8') # utf-8 pour remote files, ANSI pour locales files
+                    liste_embed = liste_embed.split("\n")
+                    embed=discord.Embed(color=0x256CB0 ,title="Liste de scénarios de : "+url, description="")
+                    for url in liste_embed:
+                        url = url.split("|")
+                        texte = url[0]
+                        if url[1].lower() == "yes":
+                            texte += " " + str("🏞️")
+                        if url[2].lower() == "yes":
+                            texte += " " + str("🔊")
+                        if url[3].lower() == "yes":
+                            texte += " " + str("🙂")
+                        embed.add_field(name=texte, value=url[4], inline=False)
+                    embed.add_field(name="Légende :", value="🏞️ : Avec images. 🔊 : Avec sons. 🙂 : Avec réactions.", inline=False)
+                    await ctx.send(embed=embed)
+                except:
+                    liste.remove("liste_scenarios.txt\n")
+                    liste = ''.join(liste)
+                    await ctx.send(f'```fix\n{liste}```')
+                    
+            else:
+                liste = ''.join(liste)
+                await ctx.send(f'```fix\n{liste}```')
         except:
             pass
 
@@ -288,7 +374,7 @@ def lire_variable(ctx, texte): #remplace v_variable_v par la valeur de variable
         texte = texte.replace('v_'+element+'_v',str(jeu[ctx.guild.id].variables[element]))
     return texte
     
-async def envoyer_texte(ctx, texte): #Convertit les liens images et sons dans le texte, ainsi que le formattage.
+async def envoyer_texte(ctx, texte, avec_reaction = "..."): #Convertit les liens images et sons dans le texte, ainsi que le formattage.
     """Envoyer le texte sur discord après avoir séparé les images et les sons"""
     with open('prefixes.json', 'r') as f: 
         prefixes = json.load(f)
@@ -303,9 +389,10 @@ async def envoyer_texte(ctx, texte): #Convertit les liens images et sons dans le
     texte = texte.replace("}}","|-*")
     texte = texte.split('|-*')
     for element in texte:
-        if element.startswith("[[") is True: #afficher l'élément sans markdown fix.
+        if element.startswith("[[") is True: #afficher l'élément sans markdown
             element = element.replace("[[","")
-            await ctx.send(f'{element}')
+            if element != "":
+                message = await ctx.send(f'{element}')
         elif element.startswith("<<") is True :  
             element = element.replace("<<","")
             if element.lower().startswith("http"):
@@ -327,7 +414,25 @@ async def envoyer_texte(ctx, texte): #Convertit les liens images et sons dans le
             except:
                 pass
         elif element != "":
-            await ctx.send(f'```fix\n{element}```')
+            element = "```" + str(jeu[ctx.guild.id].markdown) + element + "```"
+            message = await ctx.send(f'{element}')
+
+    if avec_reaction == "ok":
+        jeu[ctx.guild.id].last_reaction = element
+        for case_verifiee in jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement]:
+            if isinstance(case_verifiee,int):
+                case = case_verifiee - 1
+            else:
+                case = int(case_verifiee[0]) - 1 
+            
+            if case in (996,997,998) or jeu[ctx.guild.id].salle_react[case] == "...":
+                pass
+            else:
+                await message.add_reaction(jeu[ctx.guild.id].salle_react[case])
+        if len(jeu[ctx.guild.id].salle_reaction[str(jeu[ctx.guild.id].emplacement)]) > 0:
+            emojis = jeu[ctx.guild.id].salle_reaction[str(jeu[ctx.guild.id].emplacement)]
+            for emoji in emojis:
+                await message.add_reaction(emoji)
     
 async def verifier_objets(ctx): #Verifie les objets, variables et conditions présents dans une salle
     valeur = ""
@@ -382,6 +487,8 @@ async def condition_acces(ctx,case_actuelle,code="0"): #Vérifie si les conditio
             if objet_test == "null":
                 test = 1
                 break
+            elif "§" in objet_test: #si c'est une reaction, on ignore cette condition
+                test = 1
             elif objet_test[0] == "$":
                 test = 1
             elif objet_test[0] == '-':
@@ -459,85 +566,96 @@ async def condition_acces(ctx,case_actuelle,code="0"): #Vérifie si les conditio
                     test = 1
     return test
     
+async def executer_event(ctx,code="0",case_verifiee=[]):
+    try:
+        temporaire = case_verifiee[3] #on garde de coté le texte de la case si y'a pas d'erreur
+        jeu[ctx.guild.id].emplacement_precedent = jeu[ctx.guild.id].emplacement
+        jeu[ctx.guild.id].emplacement = int(case_verifiee[2])-1
+        if temporaire != "null": #pas d'erreur (except) ni de texte null, on envoit
+            await envoyer_texte(ctx,temporaire,avec_reaction="ok")
+        if jeu[ctx.guild.id].texte[jeu[ctx.guild.id].emplacement] != "null":
+            await envoyer_texte(ctx,jeu[ctx.guild.id].texte[jeu[ctx.guild.id].emplacement])
+        await verifier_objets(ctx)
+        await verifier_cases_speciales(ctx,code)
+        return "break"
+    except ValueError:
+        if case_verifiee[2] == "null":
+            if case_verifiee[3] != "null":
+                await envoyer_texte(ctx,case_verifiee[3])
+        elif "&&" in case_verifiee[2]:
+            try:
+                objet_temp = case_verifiee[2].split("&&")
+                jeu[ctx.guild.id].description[objet_temp[0]] = objet_temp[2]
+                if objet_temp[1] == "inventaire":
+                    if objet_temp[0][0] == "-" and objet_temp[0][1:] in jeu[ctx.guild.id].inventaire_en_cours:
+                        jeu[ctx.guild.id].inventaire_en_cours.remove(objet_temp[0][1:])
+                        if case_verifiee[3] != "null":
+                             await envoyer_texte(ctx,case_verifiee[3])
+                    elif objet_temp[0][0] != "-" and objet_temp[0] not in jeu[ctx.guild.id].inventaire_en_cours:
+                        jeu[ctx.guild.id].inventaire_en_cours.append(objet_temp[0])
+                        if case_verifiee[3] != "null":
+                            await envoyer_texte(ctx,case_verifiee[3])
+                    else:
+                        pass  #s'il n'y a pas de changement, on ignore le 997, contrairement à !prendre qui affiche un texte
+                elif objet_temp[1] == "invisible": 
+                    if objet_temp[0][0] == "-" and objet_temp[0][1:] in jeu[ctx.guild.id].inventaire_invisible:
+                        jeu[ctx.guild.id].inventaire_invisible.remove(objet_temp[0][1:])
+                        if case_verifiee[3] != "null":
+                            await envoyer_texte(ctx,case_verifiee[3])
+                    elif objet_temp[0][0] != "-" and objet_temp[0] not in jeu[ctx.guild.id].inventaire_invisible:
+                        jeu[ctx.guild.id].inventaire_invisible.append(objet_temp[0])
+                        if case_verifiee[3] != "null":
+                            await envoyer_texte(ctx,case_verifiee[3])
+                    else:
+                        pass  #s'il n'y a pas de changement, on ignore le 997, contrairement à !prendre qui affiche un texte
+                elif objet_temp[1] == "variable": 
+                    jeu[ctx.guild.id].variables[objet_temp[0]] = int(objet_temp[2])
+                    jeu[ctx.guild.id].variables_description[objet_temp[0]] = str(objet_temp[3])
+                    if case_verifiee[3] != "null":
+                        await envoyer_texte(ctx,case_verifiee[3])
+            except:
+                pass
+        else:
+            try:
+                valeur = ""
+                variable_modifiee = case_verifiee[2].split(".")
+                if not isinstance(variable_modifiee[2],int):
+                    variable_modifiee[2] = lire_variable(ctx, variable_modifiee[2])
+                if variable_modifiee[0] not in jeu[ctx.guild.id].variables:   
+                    jeu[ctx.guild.id].variables[variable_modifiee[0]] = 0
+                    jeu[ctx.guild.id].variables_description[variable_modifiee[0]] = "..."
+                if "%" in variable_modifiee[2]:
+                    valeur = variable_modifiee[2][1:].split(":")
+                    valeur = variable_modifiee[1] + str(random.randint(int(valeur[0]),int(valeur[1])))
+                    jeu[ctx.guild.id].variables["resultat"] = valeur[1:]
+                else:
+                    valeur = variable_modifiee[1] + variable_modifiee[2]
+                if "+" not in valeur and "-" not in valeur:
+                    jeu[ctx.guild.id].variables[variable_modifiee[0]] = int(valeur[1:])
+                else:
+                    jeu[ctx.guild.id].variables[variable_modifiee[0]] = jeu[ctx.guild.id].variables[variable_modifiee[0]] + int(valeur)
+                if case_verifiee[3] != "null":
+                    await envoyer_texte(ctx,case_verifiee[3])
+            except:
+                await ctx.send(f'```fix\nErreur [002] dans la variable {case_verifiee[0]} et sa valeur ajoutée {case_verifiee[2]}```')
+    except IndexError: 
+        await ctx.send(f'```fix\nLe scénario comporte une syntaxe incorrecte : probablement une erreur dans le nombre de salles.```')
+        return "break"
+    
 async def verifier_cases_speciales(ctx,code="0"):
     for case_verifiee in jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement]:
         if isinstance(case_verifiee,int):
             pass
         elif case_verifiee[0] == 997:
-            if case_verifiee[1] == "null" or await condition_acces(ctx,case_verifiee[1],code) == 1:
-                try:
-                    temporaire = case_verifiee[3] #on garde de coté le texte de la case si y'a pas d'erreur
-                    jeu[ctx.guild.id].emplacement_precedent = jeu[ctx.guild.id].emplacement
-                    jeu[ctx.guild.id].emplacement = int(case_verifiee[2])-1
-                    if temporaire != "null": #pas d'erreur (except) ni de texte null, on envoit
-                        await envoyer_texte(ctx,temporaire)
-                    if jeu[ctx.guild.id].texte[jeu[ctx.guild.id].emplacement] != "null":
-                        await envoyer_texte(ctx,jeu[ctx.guild.id].texte[jeu[ctx.guild.id].emplacement])
-                    await verifier_objets(ctx)
-                    await verifier_cases_speciales(ctx,code)
-                    break
-                except ValueError:
-                    if case_verifiee[2] == "null":
-                        if case_verifiee[3] != "null":
-                            await envoyer_texte(ctx,case_verifiee[3])
-                    elif "&&" in case_verifiee[2]:
-                        try:
-                            objet_temp = case_verifiee[2].split("&&")
-                            jeu[ctx.guild.id].description[objet_temp[0]] = objet_temp[2]
-                            if objet_temp[1] == "inventaire":
-                                if objet_temp[0][0] == "-" and objet_temp[0][1:] in jeu[ctx.guild.id].inventaire_en_cours:
-                                    jeu[ctx.guild.id].inventaire_en_cours.remove(objet_temp[0][1:])
-                                    if case_verifiee[3] != "null":
-                                        await envoyer_texte(ctx,case_verifiee[3])
-                                elif objet_temp[0][0] != "-" and objet_temp[0] not in jeu[ctx.guild.id].inventaire_en_cours:
-                                    jeu[ctx.guild.id].inventaire_en_cours.append(objet_temp[0])
-                                    if case_verifiee[3] != "null":
-                                        await envoyer_texte(ctx,case_verifiee[3])
-                                else:
-                                    pass  #s'il n'y a pas de changement, on ignore le 997, contrairement à !prendre qui affiche un texte
-                            elif objet_temp[1] == "invisible": 
-                                if objet_temp[0][0] == "-" and objet_temp[0][1:] in jeu[ctx.guild.id].inventaire_invisible:
-                                    jeu[ctx.guild.id].inventaire_invisible.remove(objet_temp[0][1:])
-                                    if case_verifiee[3] != "null":
-                                        await envoyer_texte(ctx,case_verifiee[3])
-                                elif objet_temp[0][0] != "-" and objet_temp[0] not in jeu[ctx.guild.id].inventaire_invisible:
-                                    jeu[ctx.guild.id].inventaire_invisible.append(objet_temp[0])
-                                    if case_verifiee[3] != "null":
-                                        await envoyer_texte(ctx,case_verifiee[3])
-                                else:
-                                    pass  #s'il n'y a pas de changement, on ignore le 997, contrairement à !prendre qui affiche un texte
-                            elif objet_temp[1] == "variable": 
-                                jeu[ctx.guild.id].variables[objet_temp[0]] = int(objet_temp[2])
-                                jeu[ctx.guild.id].variables_description[objet_temp[0]] = str(objet_temp[3])
-                                if case_verifiee[3] != "null":
-                                    await envoyer_texte(ctx,case_verifiee[3])
-                        except:
-                            pass
-                    else:
-                        try:
-                            valeur = ""
-                            variable_modifiee = case_verifiee[2].split(".")
-                            if not isinstance(variable_modifiee[2],int):
-                                variable_modifiee[2] = lire_variable(ctx, variable_modifiee[2])
-                            if variable_modifiee[0] not in jeu[ctx.guild.id].variables:   
-                                jeu[ctx.guild.id].variables[variable_modifiee[0]] = 0
-                                jeu[ctx.guild.id].variables_description[variable_modifiee[0]] = "..."
-                            if "%" in variable_modifiee[2]:
-                                valeur = variable_modifiee[2][1:].split(":")
-                                valeur = variable_modifiee[1] + str(random.randint(int(valeur[0]),int(valeur[1])))
-                                jeu[ctx.guild.id].variables["resultat"] = valeur[1:]
-                            else:
-                                valeur = variable_modifiee[1] + variable_modifiee[2]
-                            if "+" not in valeur and "-" not in valeur:
-                                jeu[ctx.guild.id].variables[variable_modifiee[0]] = int(valeur[1:])
-                            else:
-                                jeu[ctx.guild.id].variables[variable_modifiee[0]] = jeu[ctx.guild.id].variables[variable_modifiee[0]] + int(valeur)
-                            if case_verifiee[3] != "null":
-                                await envoyer_texte(ctx,case_verifiee[3])
-                        except:
-                            await ctx.send(f'```fix\nErreur [002] dans la variable {case_verifiee[0]} et sa valeur ajoutée {case_verifiee[2]}```')
-                except IndexError: 
-                    await ctx.send(f'```fix\nLe scénario comporte une syntaxe incorrecte : probablement une erreur dans le nombre de salles.```')
+            presence_reaction = 0
+            for objet in case_verifiee[1]:
+                if "§" in objet:
+                    presence_reaction = 1
+            if presence_reaction == 1:
+                pass
+            elif case_verifiee[1] == "null" or await condition_acces(ctx,case_verifiee[1],code) == 1:
+                event = await executer_event(ctx,code,case_verifiee)
+                if event == "break":
                     break
             else:
                 pass
@@ -694,13 +812,13 @@ async def jouer(ctx,nom_scenario="...") :
             nom_scenario += ".txt"
         
         #à partir d'un dossier local
-        # with open(os.path.join(path, nom_scenario), 'r') as data:
+        # with open(os.path.join(path, nom_scenario), 'r', encoding="utf8") as data:
             # jeu[ctx.guild.id].scenario = data.readlines()
         
         # à partir d'une url  
         url_actuelle = ""
         for url in lien[ctx.guild.id].url_lien: #On vérifie si le scénario existe, url par url.
-            try: 
+            try:
                 page = requests.get(url).text
                 soup = BeautifulSoup(page,'html.parser')
                 liste = []
@@ -759,12 +877,27 @@ async def jouer(ctx,nom_scenario="...") :
         jeu[ctx.guild.id].scenario = tableau_tmp    
             
         jeu[ctx.guild.id].scenario[0] = jeu[ctx.guild.id].scenario[0].replace('\n',"")
-        await ctx.send(f'```fix\nBienvenue dans : "{jeu[ctx.guild.id].scenario[0]}"```')
+        
         jeu[ctx.guild.id].scenario[3] = jeu[ctx.guild.id].scenario[3].rstrip().replace('+n+', '\n')
-        while i < int(jeu[ctx.guild.id].scenario[1]):  #Pour chaque case du scénario
+        num_markdown = jeu[ctx.guild.id].scenario[1].split(" ")
+        if len(num_markdown) > 1:
+            nombre_max = int(num_markdown[0])
+            jeu[ctx.guild.id].markdown = str(num_markdown[1])+"\n"
+        else:
+            nombre_max = int(num_markdown[0])
+            jeu[ctx.guild.id].markdown = "fix\n"
+        await envoyer_texte(ctx, jeu[ctx.guild.id].scenario[0])
+        while i < nombre_max:  #Pour chaque case du scénario
             jeu[ctx.guild.id].scenario[i+j] = jeu[ctx.guild.id].scenario[i+j].split(" ")
             jeu[ctx.guild.id].numero.append(jeu[ctx.guild.id].scenario[i+j][0])
-            jeu[ctx.guild.id].nom_salle.append(jeu[ctx.guild.id].scenario[i+j][1].replace('\n',''))
+            jeu[ctx.guild.id].salle_reaction[str(int(jeu[ctx.guild.id].numero[i])-1)] = ""
+            if "§" in jeu[ctx.guild.id].scenario[i+j][1]: #Si on a ajouter une reaction au nom de salle (avec le séparateur §)
+                jeu[ctx.guild.id].scenario[i+j][1] = jeu[ctx.guild.id].scenario[i+j][1].split("§") #on sépare nom et reaction
+                jeu[ctx.guild.id].nom_salle.append(jeu[ctx.guild.id].scenario[i+j][1][0]) #on récupère le nom
+                jeu[ctx.guild.id].salle_react.append(jeu[ctx.guild.id].scenario[i+j][1][1].replace('\n','')) #on récupère la réaction de salle
+            else:
+                jeu[ctx.guild.id].nom_salle.append(jeu[ctx.guild.id].scenario[i+j][1].replace('\n',''))
+                jeu[ctx.guild.id].salle_react.append("...")
             j+=1
             jeu[ctx.guild.id].texte.append(jeu[ctx.guild.id].scenario[i+j])
             jeu[ctx.guild.id].texte[i] = jeu[ctx.guild.id].texte[i].rstrip().replace('+n+', '\n')
@@ -776,15 +909,42 @@ async def jouer(ctx,nom_scenario="...") :
                 jeu[ctx.guild.id].objet.append(jeu[ctx.guild.id].scenario[i+j].strip().split("|"))
                 jeu[ctx.guild.id].nb_objets.append(int(len(jeu[ctx.guild.id].objet[i])/5))
                 for o in range(jeu[ctx.guild.id].nb_objets[i]):
-                    jeu[ctx.guild.id].objet[i][0+(o*5)] = jeu[ctx.guild.id].objet[i][0+(o*5)].lower()
-                    jeu[ctx.guild.id].objet[i][2+(o*5)] = jeu[ctx.guild.id].objet[i][2+(o*5)].replace('+n+', '\n')
-                    jeu[ctx.guild.id].objet[i][3+(o*5)] = jeu[ctx.guild.id].objet[i][3+(o*5)].replace('+n+', '\n')
-                    jeu[ctx.guild.id].objet[i][4+(o*5)] = jeu[ctx.guild.id].objet[i][4+(o*5)].replace('+n+', '\n')
+                    jeu[ctx.guild.id].objet[i][0+(o*5)] = jeu[ctx.guild.id].objet[i][0+(o*5)].lower()  #On enlève les majuscule du nom
+                    jeu[ctx.guild.id].objet_reaction[jeu[ctx.guild.id].objet[i][0+(o*5)]] = ""
+                    if "§" in jeu[ctx.guild.id].objet[i][2+(o*5)]: #On regarde si reaction dans examiner meuble
+                        jeu[ctx.guild.id].objet[i][2+(o*5)] = jeu[ctx.guild.id].objet[i][2+(o*5)].split("§")
+                        jeu[ctx.guild.id].meubleex_react.append(jeu[ctx.guild.id].objet[i][2+(o*5)][1])
+                        jeu[ctx.guild.id].objet_reaction[jeu[ctx.guild.id].objet[i][0+(o*5)]] = jeu[ctx.guild.id].objet_reaction[jeu[ctx.guild.id].objet[i][0+(o*5)]] + jeu[ctx.guild.id].objet[i][2+(o*5)][1]
+                        jeu[ctx.guild.id].salle_reaction[str(int(jeu[ctx.guild.id].numero[i])-1)] = jeu[ctx.guild.id].salle_reaction[str(int(jeu[ctx.guild.id].numero[i])-1)] + jeu[ctx.guild.id].objet[i][2+(o*5)][1]
+                        jeu[ctx.guild.id].objet[i][2+(o*5)] = jeu[ctx.guild.id].objet[i][2+(o*5)][0]
+                    else:
+                        jeu[ctx.guild.id].objet[i][2+(o*5)] = jeu[ctx.guild.id].objet[i][2+(o*5)].replace('+n+', '\n') #description meuble
+                        
+                    if "§" in jeu[ctx.guild.id].objet[i][3+(o*5)]: #On regarde si reaction dans prendre objet
+                        jeu[ctx.guild.id].objet[i][3+(o*5)] = jeu[ctx.guild.id].objet[i][3+(o*5)].split("§")
+                        jeu[ctx.guild.id].objetpr_react.append(jeu[ctx.guild.id].objet[i][3+(o*5)][1])
+                        jeu[ctx.guild.id].objet_reaction[jeu[ctx.guild.id].objet[i][0+(o*5)]] = jeu[ctx.guild.id].objet_reaction[jeu[ctx.guild.id].objet[i][0+(o*5)]] + jeu[ctx.guild.id].objet[i][3+(o*5)][1]
+                        jeu[ctx.guild.id].salle_reaction[str(int(jeu[ctx.guild.id].numero[i])-1)] = jeu[ctx.guild.id].salle_reaction[str(int(jeu[ctx.guild.id].numero[i])-1)] + jeu[ctx.guild.id].objet[i][3+(o*5)][1]
+                        jeu[ctx.guild.id].objet[i][3+(o*5)] = jeu[ctx.guild.id].objet[i][3+(o*5)][0]
+                    else:
+                        jeu[ctx.guild.id].objet[i][3+(o*5)] = jeu[ctx.guild.id].objet[i][3+(o*5)].replace('+n+', '\n') #prendre objet
+                        
+                    if "§" in jeu[ctx.guild.id].objet[i][4+(o*5)]: #On regarde si reaction dans examiner objet
+                        jeu[ctx.guild.id].objet[i][4+(o*5)] = jeu[ctx.guild.id].objet[i][4+(o*5)].split("§")
+                        jeu[ctx.guild.id].objetex_react.append(jeu[ctx.guild.id].objet[i][4+(o*5)][1])
+                        jeu[ctx.guild.id].objet_reaction[jeu[ctx.guild.id].objet[i][0+(o*5)]] = jeu[ctx.guild.id].objet_reaction[jeu[ctx.guild.id].objet[i][0+(o*5)]] + jeu[ctx.guild.id].objet[i][4+(o*5)][1]
+                        jeu[ctx.guild.id].salle_reaction[str(int(jeu[ctx.guild.id].numero[i])-1)] = jeu[ctx.guild.id].salle_reaction[str(int(jeu[ctx.guild.id].numero[i])-1)] + jeu[ctx.guild.id].objet[i][4+(o*5)][1]
+                        jeu[ctx.guild.id].objet[i][4+(o*5)] = jeu[ctx.guild.id].objet[i][4+(o*5)][0]
+                    else:
+                        jeu[ctx.guild.id].objet[i][4+(o*5)] = jeu[ctx.guild.id].objet[i][4+(o*5)].replace('+n+', '\n') #description objet
+
                     if jeu[ctx.guild.id].objet[i][1+(o*5)] == "variable":
                         jeu[ctx.guild.id].variables[jeu[ctx.guild.id].objet[i][0+(o*5)]] = 0
                         jeu[ctx.guild.id].variables_description[jeu[ctx.guild.id].objet[i][0+(o*5)]] = lire_variable(ctx, jeu[ctx.guild.id].objet[i][4+(o*5)])
                     else:
                         jeu[ctx.guild.id].description[jeu[ctx.guild.id].objet[i][0+(o*5)]] = jeu[ctx.guild.id].objet[i][4+(o*5)]
+                        
+                    jeu[ctx.guild.id].objet_reaction[jeu[ctx.guild.id].objet[i][0+(o*5)]] = tuple(jeu[ctx.guild.id].objet_reaction[jeu[ctx.guild.id].objet[i][0+(o*5)]])
             j+=1
             direction=[]
             while "*****" not in jeu[ctx.guild.id].scenario[i+j]:  #Pour chaque salle explorable à partir de l'emplacement.
@@ -800,30 +960,47 @@ async def jouer(ctx,nom_scenario="...") :
                     direction.append(end)
                     j+=1
                 else:
-                    jeu[ctx.guild.id].objet_requis = []
-                    jeu[ctx.guild.id].objet_requis.append(int(jeu[ctx.guild.id].scenario[i+j][0]))  #numéro de salle
-                    jeu[ctx.guild.id].objet_requis.append(jeu[ctx.guild.id].scenario[i+j][1].split(" ")) #le(s) objet(s) requis
+                    objet_requis = []
+                    objet_requis.append(int(jeu[ctx.guild.id].scenario[i+j][0]))  #numéro de salle
+                    objet_requis.append(jeu[ctx.guild.id].scenario[i+j][1].split(" ")) #le(s) objet(s) requis   
+                    emoji = []
+                    emoji.append(0)
+                    emoji.append([])
+                    reaction_event = 0
+                    for objet in objet_requis[1]:
+                        if "§" in str(objet):
+                            emoji[0] = int(objet.split("§")[0])
+                            emoji[1].append(objet.split("§")[1])
+                            jeu[ctx.guild.id].salle_reaction[str(int(jeu[ctx.guild.id].numero[i])-1)] = jeu[ctx.guild.id].salle_reaction[str(int(jeu[ctx.guild.id].numero[i])-1)] + objet.split("§")[1]
+                            emoji.append(jeu[ctx.guild.id].scenario[i+j][2].rstrip().replace('+n+', '\n'))
+                            emoji.append(jeu[ctx.guild.id].scenario[i+j][3].rstrip().replace('+n+', '\n'))
+                            emoji.append(jeu[ctx.guild.id].scenario[i+j][4].rstrip().replace('+n+', '\n'))
+                            reaction_event = 1
+                        else:
+                            emoji[1].append(objet)
+                    if reaction_event == 1:
+                        jeu[ctx.guild.id].event_react.append(emoji)
                     jeu[ctx.guild.id].scenario[i+j][2] = jeu[ctx.guild.id].scenario[i+j][2].rstrip().replace('+n+', '\n')
                     jeu[ctx.guild.id].scenario[i+j][3] = jeu[ctx.guild.id].scenario[i+j][3].rstrip().replace('+n+', '\n')
-                    jeu[ctx.guild.id].objet_requis.append(jeu[ctx.guild.id].scenario[i+j][2]) #texte si on a pas les objets
-                    jeu[ctx.guild.id].objet_requis.append(jeu[ctx.guild.id].scenario[i+j][3]) #texte si on a le(s) objet(s) requis
-                    direction.append(jeu[ctx.guild.id].objet_requis)
+                    objet_requis.append(jeu[ctx.guild.id].scenario[i+j][2]) #texte si on a pas les objets ou evenement activé (997)
+                    objet_requis.append(jeu[ctx.guild.id].scenario[i+j][3]) #texte si on a le(s) objet(s) requis ou si l'evenement s'active.
+                    direction.append(objet_requis)
                     j+=1
             jeu[ctx.guild.id].case.append(direction)
+            jeu[ctx.guild.id].salle_reaction[str(int(jeu[ctx.guild.id].numero[i])-1)] = list(jeu[ctx.guild.id].salle_reaction[str(int(jeu[ctx.guild.id].numero[i])-1)])
             i+=1
             
         jeu[ctx.guild.id].nom_salle = [x.lower() for x in jeu[ctx.guild.id].nom_salle]       
-       
-        await envoyer_texte(ctx, jeu[ctx.guild.id].scenario[3])
+        await envoyer_texte(ctx, jeu[ctx.guild.id].scenario[3],avec_reaction="ok")
         
         await verifier_objets(ctx) #regarder si il y a des objets/conditions invisibles ou des variables
         
         await verifier_cases_speciales(ctx) #vérifier si il y a des cases spéciales
         
         i = 0
-        
+                
     except:
-            await ctx.send(f'```fix\nLe scénario : "{nom_scenario}" comporte une syntaxe incorrecte.```')
+            await ctx.send(f'```fix\nLe scénario : "{nom_scenario}" comporte une syntaxe incorrecte au chapitre {int(i)+1}```')
             del jeu[ctx.guild.id]
             try: 
                 voice = get(bot.voice_clients, guild=ctx.guild)
@@ -858,6 +1035,8 @@ async def avancer(ctx,choix="...",code="0") :
         test=0
         i = 0
         j = 0
+        test_condition = 0
+        case_testee = 0
         for m in jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement]:
             if isinstance(jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i],int) and choix != 997:   # Si la case contient juste un chiffre (= numero de salle)
                 if choix == jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i]:      #On vérifie si c'est le numéro de salle choisis
@@ -865,18 +1044,21 @@ async def avancer(ctx,choix="...",code="0") :
                     break
             elif choix == jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][0] and choix != 997:    #autre si choix = numero
                 test = await condition_acces(ctx,jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][1],code)
-                    
-                if test == 2:
-                    if jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][2] != "null":
-                        await envoyer_texte(ctx,jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][2])
-                elif test == 1: #On vérifie si la condition est supprimée ($)
-                    if jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][3] != "null":
-                        await envoyer_texte(ctx,jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][3])
-                    if "$" in jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][1]:
-                        jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i] = int(jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][0])
-                break
+                test_condition = 1    
+                case_testee = i
+                if test == 1: #On vérifie si la condition est supprimée ($)
+                    break     
             i += 1
+        if test == 2:
+            if jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][case_testee][2] != "null":
+                await envoyer_texte(ctx,jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][case_testee][2])
         if test == 1:
+            if test_condition == 1:
+                if jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][case_testee][3] != "null":
+                    await envoyer_texte(ctx,jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][case_testee][3])
+                if "$" in jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][case_testee][1]:
+                        jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][case_testee] = int(jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][case_testee][0])
+                        
             try:
                 jeu[ctx.guild.id].variables["valeur"] = int(code)
             except ValueError: 
@@ -885,7 +1067,7 @@ async def avancer(ctx,choix="...",code="0") :
             jeu[ctx.guild.id].emplacement_precedent = jeu[ctx.guild.id].emplacement
             jeu[ctx.guild.id].emplacement = int(choix)-1
             if jeu[ctx.guild.id].texte[jeu[ctx.guild.id].emplacement] != "null":
-                await envoyer_texte(ctx,jeu[ctx.guild.id].texte[jeu[ctx.guild.id].emplacement])
+                await envoyer_texte(ctx,jeu[ctx.guild.id].texte[jeu[ctx.guild.id].emplacement],avec_reaction="ok")
                 
             await verifier_objets(ctx) #regarder si il y a des objets/conditions invisibles ou des variables
                 
@@ -900,8 +1082,8 @@ async def avancer(ctx,choix="...",code="0") :
 async def reculer(ctx,code="0") :
     await avancer(ctx,str(jeu[ctx.guild.id].emplacement_precedent+1),code)
 
-@bot.command(aliases=['pr', 'take'])     
-@commands.guild_only()     
+@bot.command(aliases=['pr', 'take'])
+@commands.guild_only()
 @in_channel('jdr-bot')
 async def prendre(ctx,objet_cible="...",par_reponse=0) :
     """j!prendre X' prend l'objet X"""
@@ -920,7 +1102,13 @@ async def prendre(ctx,objet_cible="...",par_reponse=0) :
                 jeu[ctx.guild.id].objet[jeu[ctx.guild.id].emplacement][0+(i*5)] = "null"
                 if jeu[ctx.guild.id].objet[jeu[ctx.guild.id].emplacement][3+(i*5)] != "null":
                     await envoyer_texte(ctx,jeu[ctx.guild.id].objet[jeu[ctx.guild.id].emplacement][3+(i*5)])
-                    
+                if objet_cible in jeu[ctx.guild.id].objet_reaction.keys():
+                    try:
+                        for element in jeu[ctx.guild.id].objet_reaction[objet_cible]:
+                            jeu[ctx.guild.id].salle_reaction[str(jeu[ctx.guild.id].emplacement)].remove(element)
+                    except:
+                        pass    
+                                
                 await verifier_cases_speciales(ctx,code="0") #prendre un objet reverifie et redéclenche les 997 comme lors de l'entrée dans une salle.
 
             else:
@@ -956,7 +1144,7 @@ async def examiner(ctx,cible="ici") :
                 break
 
         if cible == "ici":
-            await envoyer_texte(ctx, jeu[ctx.guild.id].texte[jeu[ctx.guild.id].emplacement]) 
+            await envoyer_texte(ctx, jeu[ctx.guild.id].texte[jeu[ctx.guild.id].emplacement],avec_reaction="ok") 
         elif cible == "invisible" or cible == "variable" or cible[0] == "-" or cible == "null":
             await ctx.send(f'```fix\nC\'est impossible !```')
         elif cible in jeu[ctx.guild.id].variables:
@@ -982,11 +1170,13 @@ async def examiner(ctx,cible="ici") :
 @bot.command(aliases=['modif', 'edit', 'change','changer'])
 @commands.guild_only()
 @in_channel('jdr-bot')
-async def modifier(ctx, variable, valeur):
+async def modifier(ctx, variable="...", valeur=0):
     """Affiche l'inventaire du joueur"""
     try:
         if ctx.guild.id in jeu:
-            if variable in jeu[ctx.guild.id].variables:
+            if variable == "...":
+                await ctx.send(f'```fix\nIl y a un souci dans vos arguments de commande. La commande est \'j!modifier nom_variable valeur\'```')
+            elif variable in jeu[ctx.guild.id].variables:
                 if variable.endswith("_m"):
                     jeu[ctx.guild.id].variables[variable] = int(valeur)
                     await ctx.send(f'```fix\nC\'est noté, {variable} = {valeur}.```')
@@ -1000,17 +1190,23 @@ async def modifier(ctx, variable, valeur):
         else:
             await ctx.send(f'```fix\nIl n\'y a pas de partie en cours !```')
     except:
-        await ctx.send(f'```fix\nIl y a un souci dans vos arguments de commande. La commande est \'j!modifier nom_variable valeur\'```')       
- 
+        await ctx.send(f'```fix\nIl y a un souci dans vos arguments de commande. La commande est \'j!modifier nom_variable valeur\'```')
+
 @bot.command(aliases=['repondre', 'répondre', 'réponse', 'reply','answer'])
 @commands.guild_only()
 @in_channel('jdr-bot')
-async def reponse(ctx, valeur, par_reponse=0): 
-    try:
-        jeu[ctx.guild.id].variables["reponse"] = int(valeur)
-        await verifier_cases_speciales(ctx,code="0")
-    except:
-        await prendre(ctx, str(valeur), 1)
+async def reponse(ctx, valeur="..."):
+    if ctx.guild.id not in jeu: #patch
+        await ctx.send(f'```fix\nAucune partie en cours !```')
+        return
+    if valeur == "...":
+        await envoyer_texte(ctx,'Veuillez indiquer une réponse : "[[PREFIX]]reponse votre_reponse"')
+    else:
+        try:
+            jeu[ctx.guild.id].variables["reponse"] = int(valeur)
+            await verifier_cases_speciales(ctx,code="0")
+        except:
+            await prendre(ctx, str(valeur), 1)
 
         
 @bot.command(aliases=['sc', 'loaded'])
@@ -1029,8 +1225,10 @@ async def scenario_en_cours(ctx):
 async def inventaire(ctx):
     """Affiche l'inventaire du joueur"""
     if ctx.guild.id in jeu:
-        inventaire_en_cours_bis = ', '.join(map(str, jeu[ctx.guild.id].inventaire_en_cours))
-        await ctx.send(f'```fix\nVotre inventaire contient : {inventaire_en_cours_bis}```')
+        embed=discord.Embed(color=0x17B93C ,title="**Inventaire**", description="Votre inventaire contient : ")
+        for objet in jeu[ctx.guild.id].inventaire_en_cours:
+            embed.add_field(name=objet, value=jeu[ctx.guild.id].description[objet], inline=False)
+        await ctx.send(embed=embed)
     else:
         await ctx.send(f'```fix\nIl n\'y a pas de partie en cours !```')
 
@@ -1071,7 +1269,8 @@ async def abandonner(ctx):
 
 # @bot.command()  #Commande modifiable pour tout type de tests pendant le dev
 # @commands.guild_only()   
-# @in_channel('jdr-bot')async def debug(ctx,texte=""):
+# @in_channel('jdr-bot')
+# async def debug(ctx,texte=""):
     # """Information de debug"""
     # texte = texte.replace('+n','\n')
     # await ctx.send(f'```\n{texte}```')
