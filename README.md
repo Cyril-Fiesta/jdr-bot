@@ -14,6 +14,8 @@ Je remercie ceux qui soutiennent le projet, en partulier :
 * [L’union des Rôlistes](http://UnionRolistes.fr/) (Leur discord est très accueillant ! Et des auteurs travaillent actuellement sur des scénarios pour JDR-Bot)
 * [VirtualJDR](https://www.virtuajdr.net/) (discord très accueillant aussi)
 * [Ludinn](https://twitter.com/Ludinn_) (vidéo twitch, youtube, discord)
+* [Moiki](https://moiki.fr/) : Site permettant d’écrire des fictions interactives, d’y jouer et de les exporter au format de JDR-Bot
+
 * Et d’autres partenaires divers (discord, forum, site, etc.)    
    
 Et bien sur tous les testeurs, les auteurs de scénarios, etc.
