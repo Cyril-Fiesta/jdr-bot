@@ -42,6 +42,7 @@ bot = commands.Bot(command_prefix=get_prefix, case_insensitive=True)
 
 base_url = "http://cyril-fiesta.fr/jdr-bot/scenarios/"
 start_time = time.time()
+categories_scenarios = {"📖" : "fiction","🔐" : "escape-game","👩‍🏫" : "tutoriel","🧩" : "exemple","🎮" : "divers"}
 
 jeu = {}
 class Rpg:
@@ -57,6 +58,8 @@ class Rpg:
         self.emplacement = 0
         self.emplacement_precedent = 0
         self.scenario = ""
+        self.options = {}
+        self.options_inv = {}
         self.description = {}
         self.variables = {"resultat" : 0,"valeur" : 0}
         self.variables_description = {"resultat" : "Résultat de ... quelque chose !", "valeur" : "Valeur de ... quelque chose !", "reponse" : "Réponse à une question ..."}
@@ -68,6 +71,8 @@ class Rpg:
         self.event_react = []
         self.objet_reaction = {} #Lie chaque reaction a l'objet correspondant
         self.salle_reaction = {} #Lie chaque réaction à la salle correspondante
+        self.alias_reaction = {} #Lie chaque réaction à l'alias correspondant
+        self.alias_reaction_inv = {} #Dictionnaire alias/reaction inversé pour l'utilisation des réactions
         self.last_reaction = ""
 #jeu[ctx.guild.id].variable
 
@@ -126,12 +131,23 @@ async def on_guild_remove(guild):
 @bot.event
 async def on_reaction_add(reaction, user):
     ctx = await bot.get_context(reaction.message)
-    if reaction.message.guild.id not in jeu or str(user) == "JDR-Bot#5773":
+    if str(user) == "JDR-Bot#5773":
         pass
-    else:
-        try : #Si l'objet est déjà pris on aura un ValueError si on examine le meuble.            
-            if reaction.emoji in jeu[reaction.message.guild.id].salle_react:
+    elif reaction.message.guild.id not in jeu and "jdr-bot" in reaction.message.channel.name and reaction.emoji in categories_scenarios:
+        await liste_scenarios(ctx,categories_scenarios[reaction.emoji])
+    elif reaction.message.guild.id in jeu:
+        try : #Si l'objet est déjà pris on aura un ValueError si on examine le meuble.
+            if reaction.emoji in jeu[ctx.guild.id].options_inv:
+                if jeu[ctx.guild.id].options_inv[reaction.emoji] == "rafraichir":
+                    await examiner(ctx)
+                elif jeu[ctx.guild.id].options_inv[reaction.emoji] == "inventaire":
+                    await inventaire(ctx)
+                    
+            elif reaction.emoji in jeu[reaction.message.guild.id].salle_react:
                 await avancer(ctx,str(jeu[reaction.message.guild.id].salle_react.index(reaction.emoji)+1),0)
+            
+            elif reaction.emoji in jeu[reaction.message.guild.id].alias_reaction.values():
+                await avancer(ctx,jeu[reaction.message.guild.id].alias_reaction_inv[reaction.emoji],0)
             
             else:
                 for cle in jeu[reaction.message.guild.id].objet_reaction:
@@ -201,7 +217,7 @@ async def on_command_error(ctx, error):
         if hasattr(ctx.command, 'on_error'):
             return
         
-        ignored = (commands.CommandNotFound, commands.UserInputError, IndexError, KeyError, discord.errors.Forbidden)
+        ignored = (commands.CommandNotFound,commands.errors.UnexpectedQuoteError,commands.errors.ExpectedClosingQuoteError, commands.UserInputError, IndexError, KeyError, discord.errors.Forbidden)
         
         # Allows us to check for original exceptions raised and sent to CommandInvokeError.
         # If nothing is found. We keep the exception passed to on_command_error.
@@ -228,7 +244,10 @@ async def on_command_error(ctx, error):
                 
         elif isinstance(error, commands.BadArgument):
             return await ctx.send(f'```fix\nIl y a une erreur dans les arguments de la commande {ctx.command}```')
-                
+
+        elif isinstance(error, discord.errors.HTTPException):
+            return await ctx.send(f'```fix\nLe texte que vous essayez d\'afficher fait plus de 2000 caractères ou comporte une réaction inexistante sur discord.```')
+         
         else:
             print('Ignoring exception in command {}:'.format(ctx.message.content), file=sys.stderr)
             traceback.print_exception(type(error), error, error.__traceback__, file=sys.stderr)
@@ -326,10 +345,13 @@ async def lien_jdr(ctx,action = "...", lien_scenarios = "..."):
 @bot.command(aliases=['scenario', 'scenarios','script','scripts','list_scripts'])
 @commands.guild_only()
 @in_channel('jdr-bot')
-async def liste_scenarios(ctx):
+async def liste_scenarios(ctx,categorie="base"):
+    with open('prefixes.json', 'r') as f: 
+        prefixes = json.load(f)
+        
     charger_url(ctx)
-    liste_existante = 0
     for url in lien[ctx.guild.id].url_lien:
+        liste_existante = 0
         try:
             page = requests.get(url).text
             soup = BeautifulSoup(page,'html.parser')
@@ -344,19 +366,33 @@ async def liste_scenarios(ctx):
                 try:
                     liste_embed = urllib.request.urlopen(url+"liste_scenarios.txt").read().decode('utf-8') # utf-8 pour remote files, ANSI pour locales files
                     liste_embed = liste_embed.split("\n")
-                    embed=discord.Embed(color=0x256CB0 ,title="Liste de scénarios de : "+url, description="")
-                    for url in liste_embed:
-                        url = url.split("|")
-                        texte = url[0]
-                        if url[1].lower() == "yes":
-                            texte += " " + str("🏞️")
-                        if url[2].lower() == "yes":
-                            texte += " " + str("🔊")
-                        if url[3].lower() == "yes":
-                            texte += " " + str("🙂")
-                        embed.add_field(name=texte, value=url[4], inline=False)
-                    embed.add_field(name="Légende :", value="🏞️ : Avec images. 🔊 : Avec sons. 🙂 : Avec réactions.", inline=False)
-                    await ctx.send(embed=embed)
+                    if categorie.lower() in categories_scenarios.values():
+                        embed=discord.Embed(color=0x256CB0 ,title= "Liste " + categorie.capitalize() + " de : "+url, description="")
+                        for scenarios in liste_embed:
+                            scenarios = scenarios.split("|")
+                            if scenarios[1].lower() == categorie.lower():
+                                texte = scenarios[0] + " (" + scenarios[1] + ")"
+                                if scenarios[2].lower() == "yes":
+                                    texte += " " + str("🏞️")
+                                if scenarios[3].lower() == "yes":
+                                    texte += " " + str("🔊")
+                                if scenarios[4].lower() == "yes":
+                                    texte += " " + str("🙂")
+                                embed.add_field(name=texte, value=scenarios[5], inline=False)
+                        embed.add_field(name="Légende :", value="🏞️ : Avec images. 🔊 : Avec sons. 🙂 : Avec réactions.", inline=False)
+                        await ctx.send(embed=embed)
+                    else:
+                        embed=discord.Embed(color=0x256CB0 ,title= "Catégories de scénarios :")
+                        embed.add_field(name="Fiction 📖", value="Fiction interactive / Aventure dont Vous êtes le Héros.", inline=False)
+                        embed.add_field(name="Escape-game 🔐", value="Escape-game, scénarios à énirgmes, etc.", inline=False)
+                        embed.add_field(name="Tutoriel 👩‍🏫", value="Guide/tutoriel de divers sujet", inline=False)
+                        embed.add_field(name="Exemple 🧩", value="Scénarios d'exemple pour l'écriture de scénarios ou tester une fonctionnalité du bot.", inline=False)
+                        embed.add_field(name="Divers 🎮", value="Jeux et scripts divers", inline=False)
+                        embed.add_field(name="Utilisation", value="Cliquez sur la reaction correspondante à la catégorie que vous voulez affichez (inutilisable pendant une partie) ou utiliser la commande `" + prefixes[str(ctx.guild.id)][0] + "liste_scenarios nom_de_la_catégorie`.", inline=False)
+                        message = await ctx.send(embed=embed)
+                        for key in categories_scenarios.keys():
+                            await message.add_reaction(key)
+                        return
                 except:
                     liste.remove("liste_scenarios.txt\n")
                     liste = ''.join(liste)
@@ -416,24 +452,34 @@ async def envoyer_texte(ctx, texte, avec_reaction = "..."): #Convertit les liens
         elif element != "":
             element = "```" + str(jeu[ctx.guild.id].markdown) + element + "```"
             message = await ctx.send(f'{element}')
-
+    if "rafraichir" in jeu[ctx.guild.id].options:
+        await message.add_reaction(jeu[ctx.guild.id].options["rafraichir"])
+    if "inventaire" in jeu[ctx.guild.id].options:
+        await message.add_reaction(jeu[ctx.guild.id].options["inventaire"])
     if avec_reaction == "ok":
         jeu[ctx.guild.id].last_reaction = element
         for case_verifiee in jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement]:
-            if isinstance(case_verifiee,int):
-                case = case_verifiee - 1
+            alias = ""
+            if isinstance(case_verifiee,list) is False:
+                case = str(case_verifiee)
             else:
-                case = int(case_verifiee[0]) - 1 
+                case = str(case_verifiee[0])
             
-            if case in (996,997,998) or jeu[ctx.guild.id].salle_react[case] == "...":
-                pass
+            if "->" in case:
+                    alias = case.split("->")[0]
+                    case = int(case.split("->")[1]) - 1
             else:
+                    case = int(case) - 1
+                    
+            if alias in jeu[ctx.guild.id].alias_reaction:
+                await message.add_reaction(jeu[ctx.guild.id].alias_reaction[alias])
+            elif case not in (996,997,998) and jeu[ctx.guild.id].salle_react[case] != "...":
                 await message.add_reaction(jeu[ctx.guild.id].salle_react[case])
         if len(jeu[ctx.guild.id].salle_reaction[str(jeu[ctx.guild.id].emplacement)]) > 0:
             emojis = jeu[ctx.guild.id].salle_reaction[str(jeu[ctx.guild.id].emplacement)]
             for emoji in emojis:
                 await message.add_reaction(emoji)
-    
+
 async def verifier_objets(ctx): #Verifie les objets, variables et conditions présents dans une salle
     valeur = ""
     changement = 0
@@ -644,9 +690,9 @@ async def executer_event(ctx,code="0",case_verifiee=[]):
     
 async def verifier_cases_speciales(ctx,code="0"):
     for case_verifiee in jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement]:
-        if isinstance(case_verifiee,int):
+        if isinstance(case_verifiee,list) is False:
             pass
-        elif case_verifiee[0] == 997:
+        elif case_verifiee[0] == "997":
             presence_reaction = 0
             for objet in case_verifiee[1]:
                 if "§" in objet:
@@ -659,7 +705,7 @@ async def verifier_cases_speciales(ctx,code="0"):
                     break
             else:
                 pass
-        elif case_verifiee[0] == 999 or case_verifiee[0] == 998:
+        elif case_verifiee[0] == "999" or case_verifiee[0] == "998":
             if case_verifiee[1] != "null":
                 await envoyer_texte(ctx,case_verifiee[1])
             await asyncio.sleep(2)
@@ -855,14 +901,10 @@ async def jouer(ctx,nom_scenario="...") :
         except:
             await ctx.send(f'```fix\nImpossible de trouver le channel vocal \'JDR-Bot\'```')
             
-        l = 0
-        for ligne in jeu[ctx.guild.id].scenario: #enlève les ligne vide.
-            if ligne.isspace() or len(ligne)==0:
-                del jeu[ctx.guild.id].scenario[l]
-            l+=1
-            
+        jeu[ctx.guild.id].scenario = [ligne for ligne in jeu[ctx.guild.id].scenario if ligne != '\n']
         tableau_tmp = []
         tmp = ""
+        
         for ligne in jeu[ctx.guild.id].scenario: #fusionne les lignes coupé par &&, et ignore les commentaires ("##")
             ligne = ligne.replace("\n","")
             ligne = ligne.split("##")[0]
@@ -875,8 +917,19 @@ async def jouer(ctx,nom_scenario="...") :
                 else:
                     tableau_tmp.append(ligne)
         jeu[ctx.guild.id].scenario = tableau_tmp    
-            
+
         jeu[ctx.guild.id].scenario[0] = jeu[ctx.guild.id].scenario[0].replace('\n',"")
+        if "|" in jeu[ctx.guild.id].scenario[0]:
+            temp = jeu[ctx.guild.id].scenario[0].split("|")
+            elem = 0
+            for element in temp:
+                if elem == 0:
+                    jeu[ctx.guild.id].scenario[0] = element
+                    elem += 1
+                elif "§" in element:
+                    element = element.split("§")
+                    jeu[ctx.guild.id].options[element[0]] = element[1]
+                    jeu[ctx.guild.id].options_inv[element[1]] = element[0]
         
         jeu[ctx.guild.id].scenario[3] = jeu[ctx.guild.id].scenario[3].rstrip().replace('+n+', '\n')
         num_markdown = jeu[ctx.guild.id].scenario[1].split(" ")
@@ -950,18 +1003,18 @@ async def jouer(ctx,nom_scenario="...") :
             while "*****" not in jeu[ctx.guild.id].scenario[i+j]:  #Pour chaque salle explorable à partir de l'emplacement.
                 jeu[ctx.guild.id].scenario[i+j] = jeu[ctx.guild.id].scenario[i+j].split("|")
                 if len(jeu[ctx.guild.id].scenario[i+j]) == 1:  #S'il n'y a qu'un numéro de salle
-                    direction.append(int(jeu[ctx.guild.id].scenario[i+j][0])) #numéro de salle
+                    direction.append(jeu[ctx.guild.id].scenario[i+j][0]) #numéro de salle
                     j+=1
-                elif int(jeu[ctx.guild.id].scenario[i+j][0]) == 998 or int(jeu[ctx.guild.id].scenario[i+j][0]) == 999:
+                elif jeu[ctx.guild.id].scenario[i+j][0] == "998" or jeu[ctx.guild.id].scenario[i+j][0] == "999":
                     end = []
-                    end.append(int(jeu[ctx.guild.id].scenario[i+j][0])) 
+                    end.append(jeu[ctx.guild.id].scenario[i+j][0]) 
                     jeu[ctx.guild.id].scenario[i+j][1] = jeu[ctx.guild.id].scenario[i+j][1].rstrip().replace('+n+', '\n')
                     end.append(jeu[ctx.guild.id].scenario[i+j][1])
                     direction.append(end)
                     j+=1
                 else:
                     objet_requis = []
-                    objet_requis.append(int(jeu[ctx.guild.id].scenario[i+j][0]))  #numéro de salle
+                    objet_requis.append(jeu[ctx.guild.id].scenario[i+j][0])  #numéro de salle
                     objet_requis.append(jeu[ctx.guild.id].scenario[i+j][1].split(" ")) #le(s) objet(s) requis   
                     emoji = []
                     emoji.append(0)
@@ -989,7 +1042,13 @@ async def jouer(ctx,nom_scenario="...") :
             jeu[ctx.guild.id].case.append(direction)
             jeu[ctx.guild.id].salle_reaction[str(int(jeu[ctx.guild.id].numero[i])-1)] = list(jeu[ctx.guild.id].salle_reaction[str(int(jeu[ctx.guild.id].numero[i])-1)])
             i+=1
-            
+        case_actuelle = i+j
+        if len(jeu[ctx.guild.id].scenario) > case_actuelle: #on vérifie si il y a des données après le scénarios
+            alias_react = jeu[ctx.guild.id].scenario[i+j].split("|")
+            for element in alias_react:
+                element = element.split("§")
+                jeu[ctx.guild.id].alias_reaction[element[0]] = element[1]
+                jeu[ctx.guild.id].alias_reaction_inv[element[1]] = element[0]
         jeu[ctx.guild.id].nom_salle = [x.lower() for x in jeu[ctx.guild.id].nom_salle]       
         await envoyer_texte(ctx, jeu[ctx.guild.id].scenario[3],avec_reaction="ok")
         
@@ -1026,28 +1085,40 @@ async def avancer(ctx,choix="...",code="0") :
     choix = str(choix).lower()
     if choix in jeu[ctx.guild.id].nom_salle:
         choix = jeu[ctx.guild.id].nom_salle.index(choix)
-        choix = int(choix)+1
+        choix = str(int(choix)+1)
+    
     try:
-        choix = int(choix)
-    except ValueError:
-        await ctx.send(f'```fix\nCeci n\'est pas un choix valide```')
-    else:
         test=0
         i = 0
         j = 0
         test_condition = 0
         case_testee = 0
-        for m in jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement]:
-            if isinstance(jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i],int) and choix != 997:   # Si la case contient juste un chiffre (= numero de salle)
-                if choix == jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i]:      #On vérifie si c'est le numéro de salle choisis
+        for case in jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement]:
+            if isinstance(case,list) is False and choix != "997":   # Si la case contient juste un chiffre (= numero de salle)
+                if "->" in case:
+                    if choix == case.split("->")[0]:
+                        choix = case.split("->")[1]
+                        test = 1
+                        break
+                elif choix == case:      #On vérifie si c'est le numéro de salle choisis
                     test = 1
                     break
-            elif choix == jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][0] and choix != 997:    #autre si choix = numero
-                test = await condition_acces(ctx,jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][i][1],code)
-                test_condition = 1    
-                case_testee = i
-                if test == 1: #On vérifie si la condition est supprimée ($)
-                    break     
+            elif isinstance(case,list) and choix != "997":    #autre si choix = numero
+                if "->" in case[0]:
+                    if choix == case[0].split("->")[0]:
+                        test = await condition_acces(ctx,case[1],code)
+                        test_condition = 1
+                        case_testee = i
+                        if test == 1:
+                            choix = case[0].split("->")[1]
+                            break     
+                else:
+                    if choix == case[0]:
+                        test = await condition_acces(ctx,case[1],code)
+                        test_condition = 1
+                        case_testee = i
+                        if test == 1:
+                            break
             i += 1
         if test == 2:
             if jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][case_testee][2] != "null":
@@ -1057,24 +1128,27 @@ async def avancer(ctx,choix="...",code="0") :
                 if jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][case_testee][3] != "null":
                     await envoyer_texte(ctx,jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][case_testee][3])
                 if "$" in jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][case_testee][1]:
-                        jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][case_testee] = int(jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][case_testee][0])
+                        jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][case_testee] = jeu[ctx.guild.id].case[jeu[ctx.guild.id].emplacement][case_testee][0]
                         
             try:
                 jeu[ctx.guild.id].variables["valeur"] = int(code)
+                jeu[ctx.guild.id].emplacement_precedent = jeu[ctx.guild.id].emplacement
+                jeu[ctx.guild.id].emplacement = int(choix)-1
+                if jeu[ctx.guild.id].texte[jeu[ctx.guild.id].emplacement] != "null":
+                    await envoyer_texte(ctx,jeu[ctx.guild.id].texte[jeu[ctx.guild.id].emplacement],avec_reaction="ok")
+                
+                await verifier_objets(ctx) #regarder si il y a des objets/conditions invisibles ou des variables
+                
+                await verifier_cases_speciales(ctx,code)
+                
             except ValueError: 
                 await ctx.send(f'```fix\nWarning : !Avancer [numéro] (valeur) : {code} n\'est pas une valeur numérique.```')
             
-            jeu[ctx.guild.id].emplacement_precedent = jeu[ctx.guild.id].emplacement
-            jeu[ctx.guild.id].emplacement = int(choix)-1
-            if jeu[ctx.guild.id].texte[jeu[ctx.guild.id].emplacement] != "null":
-                await envoyer_texte(ctx,jeu[ctx.guild.id].texte[jeu[ctx.guild.id].emplacement],avec_reaction="ok")
-                
-            await verifier_objets(ctx) #regarder si il y a des objets/conditions invisibles ou des variables
-                
-            await verifier_cases_speciales(ctx,code)
             
         elif test != 2:
             await ctx.send(f'```fix\nChoix impossible !```')
+    except:
+        await ctx.send(f'```fix\nChoix impossible ! (Une erreur est apparue)```')
 
 @bot.command(aliases=['back', 'return'])
 @commands.guild_only()  
@@ -1228,7 +1302,11 @@ async def inventaire(ctx):
         embed=discord.Embed(color=0x17B93C ,title="**Inventaire**", description="Votre inventaire contient : ")
         for objet in jeu[ctx.guild.id].inventaire_en_cours:
             embed.add_field(name=objet, value=jeu[ctx.guild.id].description[objet], inline=False)
-        await ctx.send(embed=embed)
+        message = await ctx.send(embed=embed)
+        if "rafraichir" in jeu[ctx.guild.id].options:
+            await message.add_reaction(jeu[ctx.guild.id].options["rafraichir"])
+        if "inventaire" in jeu[ctx.guild.id].options:
+            await message.add_reaction(jeu[ctx.guild.id].options["inventaire"])
     else:
         await ctx.send(f'```fix\nIl n\'y a pas de partie en cours !```')
 
