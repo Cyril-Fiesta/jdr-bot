@@ -101,11 +101,14 @@ async def on_ready():
         with open('prefixes.json', 'w') as f: 
             json.dump(prefixes, f, indent=4)
         
-        if i == 0:
-            servers_list = element.name
-            i = 1
-        else:
-            servers_list += " | " + element.name
+        try:
+            if i == 0:
+                servers_list = element.name
+                i = 1
+            else:
+                servers_list += " | " + element.name
+        except:
+            pass
     print('Active servers: ' + servers_list)
 
 @bot.event
@@ -614,13 +617,13 @@ async def condition_acces(ctx,case_actuelle,code="0"): #Vérifie si les conditio
     
 async def executer_event(ctx,code="0",case_verifiee=[]):
     try:
-        temporaire = case_verifiee[3] #on garde de coté le texte de la case si y'a pas d'erreur
+        temporaire = case_verifiee[3] #on garde de coté le texte de l'event si y'a pas d'erreur
         jeu[ctx.guild.id].emplacement_precedent = jeu[ctx.guild.id].emplacement
         jeu[ctx.guild.id].emplacement = int(case_verifiee[2])-1
         if temporaire != "null": #pas d'erreur (except) ni de texte null, on envoit
-            await envoyer_texte(ctx,temporaire,avec_reaction="ok")
+            await envoyer_texte(ctx,temporaire)
         if jeu[ctx.guild.id].texte[jeu[ctx.guild.id].emplacement] != "null":
-            await envoyer_texte(ctx,jeu[ctx.guild.id].texte[jeu[ctx.guild.id].emplacement])
+            await envoyer_texte(ctx,jeu[ctx.guild.id].texte[jeu[ctx.guild.id].emplacement],avec_reaction="ok")
         await verifier_objets(ctx)
         await verifier_cases_speciales(ctx,code)
         return "break"
@@ -900,13 +903,14 @@ async def jouer(ctx,nom_scenario="...") :
             await ctx.send(f'```fix\nImpossible de rejoindre le channel vocal \'JDR-Bot\'```')
         except:
             await ctx.send(f'```fix\nImpossible de trouver le channel vocal \'JDR-Bot\'```')
-            
-        jeu[ctx.guild.id].scenario = [ligne for ligne in jeu[ctx.guild.id].scenario if ligne != '\n']
+        
+        jeu[ctx.guild.id].scenario = [ligne for ligne in jeu[ctx.guild.id].scenario if ligne != '\n' and ligne != '\r']
         tableau_tmp = []
         tmp = ""
         
         for ligne in jeu[ctx.guild.id].scenario: #fusionne les lignes coupé par &&, et ignore les commentaires ("##")
             ligne = ligne.replace("\n","")
+            ligne = ligne.replace("\r","")
             ligne = ligne.split("##")[0]
             if ligne.endswith("&&"):
                 tmp += ligne[:-2];
@@ -916,7 +920,7 @@ async def jouer(ctx,nom_scenario="...") :
                     tmp = ""
                 else:
                     tableau_tmp.append(ligne)
-        jeu[ctx.guild.id].scenario = tableau_tmp    
+        jeu[ctx.guild.id].scenario = tableau_tmp
 
         jeu[ctx.guild.id].scenario[0] = jeu[ctx.guild.id].scenario[0].replace('\n',"")
         if "|" in jeu[ctx.guild.id].scenario[0]:
@@ -1049,7 +1053,7 @@ async def jouer(ctx,nom_scenario="...") :
                 element = element.split("§")
                 jeu[ctx.guild.id].alias_reaction[element[0]] = element[1]
                 jeu[ctx.guild.id].alias_reaction_inv[element[1]] = element[0]
-        jeu[ctx.guild.id].nom_salle = [x.lower() for x in jeu[ctx.guild.id].nom_salle]       
+        jeu[ctx.guild.id].nom_salle = [x.lower() for x in jeu[ctx.guild.id].nom_salle]
         await envoyer_texte(ctx, jeu[ctx.guild.id].scenario[3],avec_reaction="ok")
         
         await verifier_objets(ctx) #regarder si il y a des objets/conditions invisibles ou des variables
