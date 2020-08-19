@@ -3,7 +3,7 @@
 Bonsoir. Le concours de scénario est maintenant terminé, et afin de classer les participants, je prendrais en compte l'avis de tous les testeurs volontaires !
 Si vous en avez le temps, je vous demande donc de tester les 3 scénarios suivants (je vous met directement la commande) 
 
-* j!play une galerie-pour-sulimo
+* j!play une-galerie-pour-sulimo
 * j!play le-pendu
 * j!play aventure_spline
 
