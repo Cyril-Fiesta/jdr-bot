@@ -1,7 +1,7 @@
 19/08/2020 :
 
 Bonsoir. Le concours de scénario est maintenant terminé, et afin de classer les participants, je prendrais en compte l'avis de tous les testeurs volontaires !
-Si vous en avez le temps, je vou`s demande donc de tester les 3 scénarios suivants (je vous met directement la commande) 
+Si vous en avez le temps, je vous demande donc de tester les 3 scénarios suivants (je vous met directement la commande) 
 
 *j!play une galerie-pour-sulimo
 *j!play le-pendu
