@@ -44,6 +44,7 @@ bot.remove_command('help')
 base_url = "http://cyril-fiesta.fr/jdr-bot/scenarios/"
 start_time = time.time()
 categories_scenarios = {"📖" : "fiction","🔐" : "escape-game","👩‍🏫" : "tutoriel","🧩" : "exemple","🎮" : "divers"}
+url_certifiees = ("http://cyril-fiesta.fr/jdr-bot/scenarios/","http://cyril-fiesta.fr/jdr-bot2/")
 
 jeu = {}
 class Rpg:
@@ -64,6 +65,7 @@ class Rpg:
         self.description = {}
         self.variables = {"resultat" : 0,"valeur" : 0}
         self.variables_description = {"resultat" : "Résultat de ... quelque chose !", "valeur" : "Valeur de ... quelque chose !", "reponse" : "Réponse à une question ..."}
+        self.variables_texte = {}
         self.nb_objets = []
         self.salle_react = []
         self.objetpr_react = []
@@ -76,6 +78,8 @@ class Rpg:
         self.alias_reaction_inv = {} #Dictionnaire alias/reaction inversé pour l'utilisation des réactions
         self.last_reaction = ""
         self.case_auto = 0
+        self.variables_online = {}
+        self.id_scenario = ""
 #jeu[str(ctx.guild.id)+str(ctx.channel.id)].variable
 
 lien = {}
@@ -87,7 +91,7 @@ class Url:
 
 @bot.event
 async def on_ready():
-    activity = discord.Game(name="JDR-Bot 1.5.1, le JDR textuel sur discord !")
+    activity = discord.Game(name="JDR-Bot 1.6.1, le JDR textuel sur discord !")
     await bot.change_presence(activity=activity)
     servers_list = ""
     i = 0
@@ -408,9 +412,16 @@ async def liste_scenarios(ctx,categorie="base"):
             pass
 
 def lire_variable(ctx, texte): #remplace v_variable_v par la valeur de variable
+    with open('variables_online.json', 'r') as var_o: 
+        jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online = json.load(var_o)
+    for element in jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario]:
+        jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables[element] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario][element]
+
     texte = str(texte)
     for element in jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables.keys():
         texte = texte.replace('v_'+element+'_v',str(jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables[element]))
+    for element_t in jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_texte.keys():
+        texte = texte.replace('t_'+element_t+'_t',str(jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_texte[element_t]))
     return texte
     
 async def envoyer_texte(ctx, texte, avec_reaction = "..."): #Convertit les liens images et sons dans le texte, ainsi que le formattage.
@@ -515,8 +526,18 @@ async def verifier_objets(ctx): #Verifie les objets, variables et conditions pr�
                     else:
                         jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables[jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(o*5)]] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables[jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(o*5)]] + int(valeur)
                     changement = 1
+                    
+                    if jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(o*5)].endswith("_o"):
+                        if jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario.startswith(url_certifiees): #si c'est une variable_o 
+                            jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario][jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(o*5)]] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables[jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(o*5)]]
+                            with open('variables_online.json', 'w') as var_o: 
+                                json.dump(jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online, var_o, indent=4)
+                        
                 except:
                     await ctx.send(f'```fix\nErreur [001] dans la variable {jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(o*5)]} et sa valeur ajoutée {lire_variable(ctx, jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][2+(o*5)])}```')
+            elif jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][1+(o*5)] == "variable_t":
+                jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_texte[jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(o*5)]] = lire_variable(ctx, jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][2+(o*5)])
+                jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_description[jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(o*5)]] = lire_variable(ctx, jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][4+(o*5)])
             if jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][1+(o*5)] == "invisible" or jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][1+(o*5)] == "variable":
                 if jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][3+(o*5)] != "null" and changement == 1:
                     await envoyer_texte(ctx,jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][3+(o*5)])
@@ -549,60 +570,90 @@ async def condition_acces(ctx,case_actuelle,code="0"): #Vérifie si les conditio
             elif "." in objet_test:   ### A partir de là, vérifier si c'est une variable.[operateur].valeur (donc si y'a un ".")
                 try: #Au cas où la variable indiqué n'existe pas, dù à une erreur dans le scénario 
                     objet_test = objet_test.split(".") #objet_test[0] = valeur/variable, [1] = opérateur, [2] = valeur/variable
-                    if objet_test[1] == ">":
-                        if int(lire_variable(ctx, objet_test[0])) > int(lire_variable(ctx, objet_test[2])):
-                            test = 1
+                    if ("v_" in objet_test[0] or "v_" in objet_test[2]) and not ("t_" in objet_test[0] or "t_" in objet_test[2]) :
+                        if objet_test[1] == ">":
+                            if int(lire_variable(ctx, objet_test[0])) > int(lire_variable(ctx, objet_test[2])):
+                                test = 1
+                            else:
+                                test = 2
+                                break
+                        elif objet_test[1] == "<":
+                            if int(lire_variable(ctx, objet_test[0])) < int(lire_variable(ctx, objet_test[2])):
+                                test = 1
+                            else:
+                                test = 2
+                                break
+                        elif objet_test[1] == "=":
+                            if int(lire_variable(ctx, objet_test[0])) == int(lire_variable(ctx, objet_test[2])):
+                                test = 1
+                            else:
+                                test = 2
+                                break
+                        elif objet_test[1] == "<=":
+                            if int(lire_variable(ctx, objet_test[0])) <= int(lire_variable(ctx, objet_test[2])):
+                                test = 1
+                            else:
+                                test = 2
+                                break
+                        elif objet_test[1] == ">=":
+                            if int(lire_variable(ctx, objet_test[0])) >= int(lire_variable(ctx, objet_test[2])):
+                                test = 1
+                            else:
+                                test = 2
+                                break
+                        elif objet_test[1] == "!=":
+                            if int(lire_variable(ctx, objet_test[0])) != int(lire_variable(ctx, objet_test[2])):
+                                test = 1
+                            else:
+                                test = 2
+                                break
+                        elif objet_test[1] == "in":
+                            limite = objet_test[2].split("-")
+                            if int(lire_variable(ctx, objet_test[0])) in range(int(lire_variable(ctx, limite[0])),int(lire_variable(ctx, limite[1]))+1):
+                                test = 1
+                            else:
+                                test = 2
+                                break
+                        elif objet_test[1] == "out":
+                            limite = objet_test[2].split("-")
+                            if int(lire_variable(ctx, objet_test[0])) not in range(int(lire_variable(ctx, limite[0])),int(lire_variable(ctx, limite[1]))+1):
+                                test = 1
+                            else:
+                                test = 2
+                                break
                         else:
                             test = 2
+                            await ctx.send(f'```fix\n{".".join(objet_test)} est incorrect```')
                             break
-                    elif objet_test[1] == "<":
-                        if int(lire_variable(ctx, objet_test[0])) < int(lire_variable(ctx, objet_test[2])):
-                            test = 1
+                    if "t_" in objet_test[0] or "t_" in objet_test[2]:
+                        if objet_test[1] == "=":
+                            if str(lire_variable(ctx, objet_test[0])) == str(lire_variable(ctx, objet_test[2])):
+                                test = 1
+                            else:
+                                test = 2
+                                break
+                        elif objet_test[1] == "!=":
+                            if str(lire_variable(ctx, objet_test[0])) != str(lire_variable(ctx, objet_test[2])):
+                                test = 1
+                            else:
+                                test = 2
+                                break
+                        elif objet_test[1] == "in":
+                            if str(lire_variable(ctx, objet_test[0])) in str(lire_variable(ctx, objet_test[2])):
+                                test = 1
+                            else:
+                                test = 2
+                                break
+                        elif objet_test[1] == "out":
+                            if str(lire_variable(ctx, objet_test[0])) not in str(lire_variable(ctx, objet_test[2])):
+                                test = 1
+                            else:
+                                test = 2
+                                break
                         else:
                             test = 2
+                            await ctx.send(f'```fix\n{".".join(objet_test)} est incorrect```')
                             break
-                    elif objet_test[1] == "=":
-                        if int(lire_variable(ctx, objet_test[0])) == int(lire_variable(ctx, objet_test[2])):
-                            test = 1
-                        else:
-                            test = 2
-                            break
-                    elif objet_test[1] == "<=":
-                        if int(lire_variable(ctx, objet_test[0])) <= int(lire_variable(ctx, objet_test[2])):
-                            test = 1
-                        else:
-                            test = 2
-                            break
-                    elif objet_test[1] == ">=":
-                        if int(lire_variable(ctx, objet_test[0])) >= int(lire_variable(ctx, objet_test[2])):
-                            test = 1
-                        else:
-                            test = 2
-                            break
-                    elif objet_test[1] == "!=":
-                        if int(lire_variable(ctx, objet_test[0])) != int(lire_variable(ctx, objet_test[2])):
-                            test = 1
-                        else:
-                            test = 2
-                            break
-                    elif objet_test[1] == "in":
-                        limite = objet_test[2].split("-")
-                        if int(lire_variable(ctx, objet_test[0])) in range(int(lire_variable(ctx, limite[0])),int(lire_variable(ctx, limite[1]))+1):
-                            test = 1
-                        else:
-                            test = 2
-                            break
-                    elif objet_test[1] == "out":
-                        limite = objet_test[2].split("-")
-                        if int(lire_variable(ctx, objet_test[0])) not in range(int(lire_variable(ctx, limite[0])),int(lire_variable(ctx, limite[1]))+1):
-                            test = 1
-                        else:
-                            test = 2
-                            break
-                    else:
-                        test = 2
-                        await ctx.send(f'```fix\n{objet_test} est incorrect```')
-                        break
                 except:
                     await ctx.send(f'```fix\nLe scénario comporte une syntaxe incorrecte : probablement une variable qui n\'existe pas.```')
                     test = 2
@@ -678,6 +729,12 @@ async def executer_event(ctx,code="0",case_verifiee=[]):
                 try:
                     valeur = ""
                     variable_modifiee = element.split(".")
+
+                    if variable_modifiee[0].endswith("_o"):
+                        with open('variables_online.json', 'r') as var_o: 
+                            jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online = json.load(var_o)
+                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables[variable_modifiee[0]] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario][variable_modifiee[0]]
+                        
                     if not isinstance(variable_modifiee[2],int):
                         variable_modifiee[2] = lire_variable(ctx, variable_modifiee[2])
                     if variable_modifiee[0] not in jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables:   
@@ -695,8 +752,15 @@ async def executer_event(ctx,code="0",case_verifiee=[]):
                         jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables[variable_modifiee[0]] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables[variable_modifiee[0]] + int(valeur)
                     if case_verifiee[3] != "null":
                         afficher_texte = 1
+                    
+                    if variable_modifiee[0].endswith("_o"):
+                        if jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario.startswith(url_certifiees):
+                            jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario][variable_modifiee[0]] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables[variable_modifiee[0]]
+                            with open('variables_online.json', 'w') as var_o: 
+                                json.dump(jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online, var_o, indent=4)
+
                 except:
-                    await ctx.send(f'```fix\nErreur [002] dans la variable {case_verifiee[0]} et sa valeur ajoutée {element}```')
+                    await ctx.send(f'```fix\nErreur [002] dans la variable {variable_modifiee[0]} et sa valeur ajoutée {element}```')
         except IndexError: 
             await ctx.send(f'```fix\nLe scénario comporte une syntaxe incorrecte : probablement une erreur dans le nombre de salles.```')
             return "break"
@@ -717,7 +781,8 @@ async def verifier_cases_speciales(ctx,code="0"):
             elif case_verifiee[1] == "null" or await condition_acces(ctx,case_verifiee[1],code) == 1:
                 event = await executer_event(ctx,code,case_verifiee)
                 if event == "break":
-                    jeu[str(ctx.guild.id)+str(ctx.channel.id)].case_auto = 0
+                    if str(ctx.guild.id)+str(ctx.channel.id) in jeu:
+                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].case_auto = 0
                     break
             else:
                 pass
@@ -733,6 +798,7 @@ async def verifier_cases_speciales(ctx,code="0"):
                 await voice.disconnect()
             except:
                 pass
+            return
         else:
             pass
 
@@ -901,6 +967,8 @@ async def jouer(ctx,nom_scenario="...") :
         data = data.replace("\n","/n\n").split("\n")
         jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario = [x.replace("/n","\n") for x in data]
         
+        jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario = url_actuelle+nom_scenario  #Version en ligne
+        # jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario = "local/" + nom_scenario  #Version en local
         
     except: # gérer l'erreur : le scénario n'a pas été trouvé sur une des url ou son nom est incorrect.
         await ctx.send(f'```fix\nLe scénario : "{nom_scenario}" n\'existe pas !```')
@@ -916,6 +984,23 @@ async def jouer(ctx,nom_scenario="...") :
             await ctx.send(f'```fix\nImpossible de rejoindre le channel vocal \'JDR-Bot\'```')
         except:
             await ctx.send(f'```fix\nImpossible de trouver le channel vocal \'JDR-Bot\'```')
+        
+        with open('variables_online.json', 'r') as var_o: 
+            jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online = json.load(var_o)
+            if jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario not in jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online:
+                jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario] = {}
+            
+        if "nb_parties_o" in jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario]:
+            jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario]["nb_parties_o"] += 1
+            jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables["nb_parties_o"] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario]["nb_parties_o"]
+        else:
+            jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables["nb_parties_o"] = 1
+            jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario]["nb_parties_o"] = 1
+        jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_description["nb_parties_o"] = "Nombre de parties jouées"
+        
+        if jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario.startswith(url_certifiees):
+            with open('variables_online.json', 'w') as var_o: 
+                json.dump(jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online, var_o, indent=4)
         
         jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario = [ligne for ligne in jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario if ligne != '\n' and ligne != '\r']
         tableau_tmp = []
@@ -956,7 +1041,6 @@ async def jouer(ctx,nom_scenario="...") :
         else:
             nombre_max = int(num_markdown[0])
             jeu[str(ctx.guild.id)+str(ctx.channel.id)].markdown = "fix\n"
-        await envoyer_texte(ctx, jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[0])
         while i < nombre_max:  #Pour chaque case du scénario
             jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j].split(" ")
             jeu[str(ctx.guild.id)+str(ctx.channel.id)].numero.append(jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j][0])
@@ -1061,15 +1145,34 @@ async def jouer(ctx,nom_scenario="...") :
             jeu[str(ctx.guild.id)+str(ctx.channel.id)].salle_reaction[str(int(jeu[str(ctx.guild.id)+str(ctx.channel.id)].numero[i])-1)] = list(jeu[str(ctx.guild.id)+str(ctx.channel.id)].salle_reaction[str(int(jeu[str(ctx.guild.id)+str(ctx.channel.id)].numero[i])-1)])
             i+=1
         case_actuelle = i+j
-        if len(jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario) > case_actuelle: #on vérifie si il y a des données après le scénarios
-            alias_react = jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j].split("|")
-            for element in alias_react:
-                if '§' in element:                                                                 
-                    element = element.split("§")
-                    jeu[str(ctx.guild.id)+str(ctx.channel.id)].alias_reaction[element[0]] = element[1]
-                    jeu[str(ctx.guild.id)+str(ctx.channel.id)].alias_reaction_inv[element[1]] = element[0]
+
+        for ligne in range(case_actuelle,len(jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario)): #Pour chaque ligne après la dernière salle
+            ligne_actuelle = jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[ligne]
+            # print(jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[ligne])
+            if "§" in ligne_actuelle: # Alors il s'agit de la ligne des alias des réactions
+                alias_react = jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[ligne].split("|")
+                for element in alias_react:
+                    if '§' in element:                                                                 
+                        element = element.split("§")
+                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].alias_reaction[element[0]] = element[1]
+                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].alias_reaction_inv[element[1]] = element[0]
+            
+            if "_o" in ligne_actuelle: #Alors il s'agit d'une variables_online (variable_o)
+                var_onl = jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[ligne].split("|")
+                if var_onl[0] in jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario]:
+                    jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables[var_onl[0]] = int(jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario][var_onl[0]])
+                else:
+                    jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario][var_onl[0]] = int(var_onl[1])
+                    jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables[var_onl[0]] = int(var_onl[1])
+                jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_description[var_onl[0]] = var_onl[2]
+                       
+        if jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario.startswith(url_certifiees):
+            with open('variables_online.json', 'w') as var_o: 
+                json.dump(jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online, var_o, indent=4)
+                
         jeu[str(ctx.guild.id)+str(ctx.channel.id)].nom_salle = [x.lower() for x in jeu[str(ctx.guild.id)+str(ctx.channel.id)].nom_salle]
         
+        await envoyer_texte(ctx, jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[0])    
         if jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[3] != "null":
             await envoyer_texte(ctx, jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[3],avec_reaction="ok")
         
@@ -1078,9 +1181,8 @@ async def jouer(ctx,nom_scenario="...") :
         await verifier_cases_speciales(ctx) #vérifier si il y a des cases spéciales
         
         i = 0
-                
     except:
-            await ctx.send(f'```fix\nLe scénario : "{nom_scenario}" comporte une syntaxe incorrecte au chapitre {int(i)+1}```')
+            await ctx.send(f'```fix\nLe scénario : "{nom_scenario}" comporte une syntaxe incorrecte au chapitre {int(i)+1}, près de la ligne {int(i+j+1)}```')
             del jeu[str(ctx.guild.id)+str(ctx.channel.id)]
             try: 
                 voice = get(bot.voice_clients, guild=ctx.guild)
@@ -1165,8 +1267,11 @@ async def avancer(ctx,choix="...",code="0") :
             except ValueError: 
                 await ctx.send(f'```fix\nWarning : !Avancer [numéro] (valeur) : {code} n\'est pas une valeur numérique.```')
             
+            
         elif test != 2:
             await ctx.send(f'```fix\nChoix impossible !```')
+    except IndexError:
+        await ctx.send(f'```fix\nLe scénario comporte une syntaxe incorrecte (probablement nombre de salles incorrect)```')
     except:
         pass #Arrive lorsque le scénario ou discord envoie une redirection après la fermeture du scénario (= keyerror)
 
@@ -1245,6 +1350,9 @@ async def examiner(ctx,cible="ici") :
             if cible.endswith("_s") is False or cible == "resultat":
                 await ctx.send(f'```fix\n{cible} : {jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables[cible]}```')
             await envoyer_texte(ctx,jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_description[cible])
+        elif cible in jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_texte:
+            await ctx.send(f'```fix\n{cible} : {jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_texte[cible]}```')
+            await envoyer_texte(ctx,jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_description[cible])
         elif cible in jeu[str(ctx.guild.id)+str(ctx.channel.id)].inventaire_en_cours or cible in jeu[str(ctx.guild.id)+str(ctx.channel.id)].inventaire_invisible or cible2 == "objet":
             await envoyer_texte(ctx,jeu[str(ctx.guild.id)+str(ctx.channel.id)].description[cible])
         elif jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(i*5)] != "|":
@@ -1293,8 +1401,17 @@ async def reponse(ctx, valeur="..."):
     if str(ctx.guild.id)+str(ctx.channel.id) not in jeu: #patch
         await ctx.send(f'```fix\nAucune partie en cours !```')
         return
+    variable_texte = ""
+    for i in range(jeu[str(ctx.guild.id)+str(ctx.channel.id)].nb_objets[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement]):
+        if jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][i*5+1] == "variable_t":
+            variable_texte = jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][i*5]
+            var = i
     if valeur == "...":
         await envoyer_texte(ctx,'Veuillez indiquer une réponse : "[[PREFIX]]reponse votre_reponse"')
+    elif variable_texte != "":
+        jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_texte[variable_texte] = valeur
+        await envoyer_texte(ctx,jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][var*5+3])
+        await verifier_cases_speciales(ctx,code="0")
     else:
         try:
             jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables["reponse"] = int(valeur)
