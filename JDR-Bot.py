@@ -82,18 +82,18 @@ class Rpg:
         self.variables_texte_online = {}
         self.id_scenario = ""
         self.reaction_en_cours = 0
-#jeu[str(ctx.guild.id)+str(ctx.channel.id)].variable
+#jeu[id_partie].variable
 
 lien = {}
 class Url:
     def __init__(self):
         self.url_lien = []
-#lien[str(ctx.guild.id)+str(ctx.channel.id)].variable
+#lien[id_partie].variable
 
 
 @bot.event
 async def on_ready():
-    activite = "JDR-Bot 1.7, le JDR textuel sur discord ! " + str(len(bot.guilds)) + " serveurs."
+    activite = "JDR-Bot 1.7.1, le JDR textuel sur discord ! " + str(len(bot.guilds)) + " serveurs."
     activity = discord.Game(name=activite)
     await bot.change_presence(activity=activity)
     servers_list = ""
@@ -122,6 +122,9 @@ async def on_ready():
 
 @bot.event
 async def on_guild_join(guild):
+    activite = "JDR-Bot 1.7, le JDR textuel sur discord ! " + str(len(bot.guilds)) + " serveurs."
+    activity = discord.Game(name=activite)
+    await bot.change_presence(activity=activity)
     with open('prefixes.json', 'r') as f: 
         prefixes = json.load(f)
     
@@ -132,6 +135,9 @@ async def on_guild_join(guild):
 
 @bot.event
 async def on_guild_remove(guild):
+    activite = "JDR-Bot 1.7, le JDR textuel sur discord ! " + str(len(bot.guilds)) + " serveurs."
+    activity = discord.Game(name=activite)
+    await bot.change_presence(activity=activity)
     with open('prefixes.json', 'r') as f: 
         prefixes = json.load(f)
     
@@ -143,77 +149,78 @@ async def on_guild_remove(guild):
 @bot.event
 async def on_reaction_add(reaction, user):
     ctx = await bot.get_context(reaction.message)
+    id_partie = str(reaction.message.guild.id)+str(reaction.message.channel.id)
     if str(user) == "JDR-Bot#5773":
         pass
-    elif str(reaction.message.guild.id)+str(reaction.message.channel.id) not in jeu and "jdr-bot" in reaction.message.channel.name and reaction.emoji in categories_scenarios:
+    elif id_partie not in jeu and "jdr-bot" in reaction.message.channel.name and reaction.emoji in categories_scenarios:
         await liste_scenarios(ctx,categories_scenarios[reaction.emoji])
-    elif str(reaction.message.guild.id)+str(reaction.message.channel.id) in jeu:
-        if jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].reaction_en_cours == 0:
+    elif id_partie in jeu:
+        if jeu[id_partie].reaction_en_cours == 0:
             try : #Si l'objet est déjà pris on aura un ValueError si on examine le meuble.
-                if reaction.emoji in jeu[str(ctx.guild.id)+str(ctx.channel.id)].options_inv:
-                    if jeu[str(ctx.guild.id)+str(ctx.channel.id)].options_inv[reaction.emoji] == "rafraichir":
-                        jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].reaction_en_cours = 1
+                if reaction.emoji in jeu[id_partie].options_inv:
+                    if jeu[id_partie].options_inv[reaction.emoji] == "rafraichir":
+                        jeu[id_partie].reaction_en_cours = 1
                         await examiner(ctx)
-                        jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].reaction_en_cours = 0
-                    elif jeu[str(ctx.guild.id)+str(ctx.channel.id)].options_inv[reaction.emoji] == "inventaire":
-                        jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].reaction_en_cours = 1
+                        jeu[id_partie].reaction_en_cours = 0
+                    elif jeu[id_partie].options_inv[reaction.emoji] == "inventaire":
+                        jeu[id_partie].reaction_en_cours = 1
                         await inventaire(ctx)
-                        jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].reaction_en_cours = 0
-                    elif jeu[str(ctx.guild.id)+str(ctx.channel.id)].options_inv[reaction.emoji] == "precedent":
-                        jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].reaction_en_cours = 1
+                        jeu[id_partie].reaction_en_cours = 0
+                    elif jeu[id_partie].options_inv[reaction.emoji] == "precedent":
+                        jeu[id_partie].reaction_en_cours = 1
                         await avancer(ctx,"0",0)
-                        jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].reaction_en_cours = 0
+                        jeu[id_partie].reaction_en_cours = 0
                     else:
-                        jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].reaction_en_cours = 1
-                        if jeu[str(ctx.guild.id)+str(ctx.channel.id)].options_inv[reaction.emoji].startswith("v_") or jeu[str(ctx.guild.id)+str(ctx.channel.id)].options_inv[reaction.emoji].startswith("t_"):
-                            await examiner(ctx, jeu[str(ctx.guild.id)+str(ctx.channel.id)].options_inv[reaction.emoji][2:-2])
+                        jeu[id_partie].reaction_en_cours = 1
+                        if jeu[id_partie].options_inv[reaction.emoji].startswith("v_") or jeu[id_partie].options_inv[reaction.emoji].startswith("t_"):
+                            await examiner(ctx, jeu[id_partie].options_inv[reaction.emoji][2:-2])
                         else:
-                            await avancer(ctx,jeu[str(ctx.guild.id)+str(ctx.channel.id)].options_inv[reaction.emoji],0)
-                        jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].reaction_en_cours = 0
+                            await avancer(ctx,jeu[id_partie].options_inv[reaction.emoji],0)
+                        jeu[id_partie].reaction_en_cours = 0
                         
                     
-                elif reaction.emoji in jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].salle_react:
-                    jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].reaction_en_cours = 1
-                    await avancer(ctx,str(jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].salle_react.index(reaction.emoji)+1),0)
-                    jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].reaction_en_cours = 0
+                elif reaction.emoji in jeu[id_partie].salle_react:
+                    jeu[id_partie].reaction_en_cours = 1
+                    await avancer(ctx,str(jeu[id_partie].salle_react.index(reaction.emoji)+1),0)
+                    jeu[id_partie].reaction_en_cours = 0
             
-                elif reaction.emoji in jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].alias_reaction.values():
-                    jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].reaction_en_cours = 1
-                    await avancer(ctx,jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].alias_reaction_inv[reaction.emoji],0)
-                    jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].reaction_en_cours = 0
+                elif reaction.emoji in jeu[id_partie].alias_reaction.values():
+                    jeu[id_partie].reaction_en_cours = 1
+                    await avancer(ctx,jeu[id_partie].alias_reaction_inv[reaction.emoji],0)
+                    jeu[id_partie].reaction_en_cours = 0
                 
                 else:
-                    for cle in jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].objet_reaction:
-                        if reaction.emoji in jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].objet_reaction[cle]:
+                    for cle in jeu[id_partie].objet_reaction:
+                        if reaction.emoji in jeu[id_partie].objet_reaction[cle]:
                             objet = cle
-                            if objet in jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].emplacement]:
-                                meuble = jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].emplacement].index(objet) + 1
+                            if objet in jeu[id_partie].objet[jeu[id_partie].emplacement]:
+                                meuble = jeu[id_partie].objet[jeu[id_partie].emplacement].index(objet) + 1
                             else:
                                 meuble = "???"
                             break
-                    if reaction.emoji in jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].meubleex_react and reaction.emoji in jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].salle_reaction[str(jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].emplacement)]:
+                    if reaction.emoji in jeu[id_partie].meubleex_react and reaction.emoji in jeu[id_partie].salle_reaction[str(jeu[id_partie].emplacement)]:
                         if isinstance(meuble,int):
-                            jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].reaction_en_cours = 1
-                            await examiner(ctx, jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].emplacement][meuble])
-                            jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].reaction_en_cours = 0
+                            jeu[id_partie].reaction_en_cours = 1
+                            await examiner(ctx, jeu[id_partie].objet[jeu[id_partie].emplacement][meuble])
+                            jeu[id_partie].reaction_en_cours = 0
                         else:
-                            jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].reaction_en_cours = 1
+                            jeu[id_partie].reaction_en_cours = 1
                             await examiner(ctx,"objet_inconnu...")
-                            jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].reaction_en_cours = 0
-                    elif reaction.emoji in jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].objetex_react and reaction.emoji in jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].salle_reaction[str(jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].emplacement)]:
-                        jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].reaction_en_cours = 1
+                            jeu[id_partie].reaction_en_cours = 0
+                    elif reaction.emoji in jeu[id_partie].objetex_react and reaction.emoji in jeu[id_partie].salle_reaction[str(jeu[id_partie].emplacement)]:
+                        jeu[id_partie].reaction_en_cours = 1
                         await examiner(ctx, objet)
-                        jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].reaction_en_cours = 0
+                        jeu[id_partie].reaction_en_cours = 0
                     
-                    elif reaction.emoji in jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].objetpr_react and reaction.emoji in jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].salle_reaction[str(jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].emplacement)]:
-                        jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].reaction_en_cours = 1
+                    elif reaction.emoji in jeu[id_partie].objetpr_react and reaction.emoji in jeu[id_partie].salle_reaction[str(jeu[id_partie].emplacement)]:
+                        jeu[id_partie].reaction_en_cours = 1
                         await prendre(ctx, objet)
-                        jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].reaction_en_cours = 0
+                        jeu[id_partie].reaction_en_cours = 0
                             
-                    elif reaction.emoji in jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].salle_reaction[str(jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].emplacement)]:
-                        jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].reaction_en_cours = 1
+                    elif reaction.emoji in jeu[id_partie].salle_reaction[str(jeu[id_partie].emplacement)]:
+                        jeu[id_partie].reaction_en_cours = 1
                         i = 0
-                        for element in jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].event_react:
+                        for element in jeu[id_partie].event_react:
                             if reaction.emoji in element[1]:
                                 verification = []
                                 for objet in element[1]:
@@ -222,13 +229,13 @@ async def on_reaction_add(reaction, user):
                                 verification[pos] = "§"
                                 if await condition_acces(ctx,verification,code="0") == 1 and element[0] > 0:
                                     await executer_event(ctx,0,element)
-                                    jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].event_react[i][0] -= 1
+                                    jeu[id_partie].event_react[i][0] -= 1
                                 else:
                                     if element[4] != "null":
                                         await envoyer_texte(ctx,element[4])
                                 break
                             i += 1
-                        jeu[str(reaction.message.guild.id)+str(reaction.message.channel.id)].reaction_en_cours = 0
+                        jeu[id_partie].reaction_en_cours = 0
                             
             except:
                 pass
@@ -324,12 +331,13 @@ async def warning(ctx,*message): #Cette commande me permet de prevenir des maint
 
 def charger_url(ctx): #On charge les url de base et de la description.
     global base_url
+    id_partie = str(ctx.guild.id)+str(ctx.channel.id)
     
-    if str(ctx.guild.id)+str(ctx.channel.id) not in lien:
-        lien[str(ctx.guild.id)+str(ctx.channel.id)] = Url()
+    if id_partie not in lien:
+        lien[id_partie] = Url()
    
-    if base_url not in lien[str(ctx.guild.id)+str(ctx.channel.id)].url_lien:
-        lien[str(ctx.guild.id)+str(ctx.channel.id)].url_lien.append(base_url)
+    if base_url not in lien[id_partie].url_lien:
+        lien[id_partie].url_lien.append(base_url)
         
     try:
         topic = ctx.message.channel.topic.replace('\n',' ').lower().split(" ")
@@ -339,8 +347,8 @@ def charger_url(ctx): #On charge les url de base et de la description.
                 url = element
                 if url.endswith("/") is False:
                     url += "/"
-                if url not in lien[str(ctx.guild.id)+str(ctx.channel.id)].url_lien:
-                    lien[str(ctx.guild.id)+str(ctx.channel.id)].url_lien.append(url)
+                if url not in lien[id_partie].url_lien:
+                    lien[id_partie].url_lien.append(url)
     except:
         pass
 
@@ -350,6 +358,7 @@ def charger_url(ctx): #On charge les url de base et de la description.
 async def lien_jdr(ctx,action = "...", lien_scenarios = "..."): 
     """Affiche ou Modifie l'url où se trouve les scénarios."""
     global base_url
+    id_partie = str(ctx.guild.id)+str(ctx.channel.id)
     charger_url(ctx)
     
     lien_scenarios = lien_scenarios.lower()
@@ -360,25 +369,25 @@ async def lien_jdr(ctx,action = "...", lien_scenarios = "..."):
     if action == "..." or action == "liste" or action == "list" or authorperms.manage_channels is False:
         liste_url = []
         liste_url.append("Liste d\'url de scénarios :\n")
-        for element in lien[str(ctx.guild.id)+str(ctx.channel.id)].url_lien:
+        for element in lien[id_partie].url_lien:
             liste_url.append(str(element)+"\n")
         liste = ''.join(liste_url)
         await ctx.send(f'```fix\n{liste}```')
     elif action == "default" or action == "base" or action == "reset":
-        lien[str(ctx.guild.id)+str(ctx.channel.id)].url_lien = [base_url]
-        await ctx.send(f'```fix\nL\'url des scénarios est désormais : {lien[str(ctx.guild.id)+str(ctx.channel.id)].url_lien[0]}```')
+        lien[id_partie].url_lien = [base_url]
+        await ctx.send(f'```fix\nL\'url des scénarios est désormais : {lien[id_partie].url_lien[0]}```')
     elif action == "add" or action == "ajouter":
         if lien_scenarios.startswith("http"):
-            if lien_scenarios not in lien[str(ctx.guild.id)+str(ctx.channel.id)].url_lien:
-                lien[str(ctx.guild.id)+str(ctx.channel.id)].url_lien.append(lien_scenarios)
+            if lien_scenarios not in lien[id_partie].url_lien:
+                lien[id_partie].url_lien.append(lien_scenarios)
                 await ctx.send(f'```fix\nL\'url est ajoutée à JDR-Bot.```')
             else:
                 await ctx.send(f'```fix\nL\'url est déjà prise en compte par JDR-Bot.```')
         else:
             await ctx.send(f'```fix\nMerci d\'indiquer une url correcte.```')
     elif action == "retirer" or action == "remove":
-        if lien_scenarios in lien[str(ctx.guild.id)+str(ctx.channel.id)].url_lien:
-            lien[str(ctx.guild.id)+str(ctx.channel.id)].url_lien.remove(lien_scenarios)
+        if lien_scenarios in lien[id_partie].url_lien:
+            lien[id_partie].url_lien.remove(lien_scenarios)
             await ctx.send(f'```fix\nL\'url est retirée de JDR-Bot.```')
         else:
             await ctx.send(f'```fix\nCette url n\'est pas présente dans JDR-Bot.```')
@@ -389,11 +398,12 @@ async def lien_jdr(ctx,action = "...", lien_scenarios = "..."):
 @commands.guild_only()
 @in_channel('jdr-bot')
 async def liste_scenarios(ctx,categorie="base"):
+    id_partie = str(ctx.guild.id)+str(ctx.channel.id)
     with open('prefixes.json', 'r') as f: 
         prefixes = json.load(f)
         
     charger_url(ctx)
-    for url in lien[str(ctx.guild.id)+str(ctx.channel.id)].url_lien:
+    for url in lien[id_partie].url_lien:
         liste_existante = 0
         try:
             page = requests.get(url).text
@@ -446,31 +456,33 @@ async def liste_scenarios(ctx,categorie="base"):
             pass
 
 def lire_variable(ctx, texte): #remplace v_variable_v par la valeur de variable
+    id_partie = str(ctx.guild.id)+str(ctx.channel.id)
     with open('variables_online.json', 'r') as var_o: 
-        jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online = json.load(var_o)
-    for element in jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario]:
-        if element in jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables:
-            jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables[element] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario][element]
+        jeu[id_partie].variables_online = json.load(var_o)
+    for element in jeu[id_partie].variables_online[jeu[id_partie].id_scenario]:
+        if element in jeu[id_partie].variables:
+            jeu[id_partie].variables[element] = jeu[id_partie].variables_online[jeu[id_partie].id_scenario][element]
         else:
-            jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_texte[element] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario][element]
+            jeu[id_partie].variables_texte[element] = jeu[id_partie].variables_online[jeu[id_partie].id_scenario][element]
         
     texte = str(texte)
-    for element in jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables.keys():
-        texte = texte.replace('v_'+element+'_v',str(jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables[element]))
-    for element_t in jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_texte.keys():
-        texte = texte.replace('t_'+element_t+'_t',str(jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_texte[element_t]))
+    for element in jeu[id_partie].variables.keys():
+        texte = texte.replace('v_'+element+'_v',str(jeu[id_partie].variables[element]))
+    for element_t in jeu[id_partie].variables_texte.keys():
+        texte = texte.replace('t_'+element_t+'_t',str(jeu[id_partie].variables_texte[element_t]))
     return texte
     
 async def envoyer_texte(ctx, texte, avec_reaction = "..."): #Convertit les liens images et sons dans le texte, ainsi que le formattage.
     """Envoyer le texte sur discord après avoir séparé les images et les sons"""
+    id_partie = str(ctx.guild.id)+str(ctx.channel.id)
     with open('prefixes.json', 'r') as f: 
         prefixes = json.load(f)
         
     texte = lire_variable(ctx, texte)
     texte = texte.replace("[[PREFIX]]",prefixes[str(ctx.guild.id)][0])
-    texte = texte.replace("[[INVENTAIRE]]",", ".join(jeu[str(ctx.guild.id)+str(ctx.channel.id)].inventaire_en_cours))
-    for numero in range(len(jeu[str(ctx.guild.id)+str(ctx.channel.id)].texte)):
-        texte = texte.replace("[[SALLE:"+str(numero+1)+"]]",jeu[str(ctx.guild.id)+str(ctx.channel.id)].texte[numero])
+    texte = texte.replace("[[INVENTAIRE]]",", ".join(jeu[id_partie].inventaire_en_cours))
+    for numero in range(len(jeu[id_partie].texte)):
+        texte = texte.replace("[[SALLE:"+str(numero+1)+"]]",jeu[id_partie].texte[numero])
     texte = texte.replace("[[","|-*[[")
     texte = texte.replace("]]","|-*")
     texte = texte.replace("<<","|-*<<")
@@ -504,25 +516,25 @@ async def envoyer_texte(ctx, texte, avec_reaction = "..."): #Convertit les liens
             except:
                 pass
         elif element != "":
-            element = "```" + str(jeu[str(ctx.guild.id)+str(ctx.channel.id)].markdown) + element + "```"
+            element = "```" + str(jeu[id_partie].markdown) + element + "```"
             message = await ctx.send(f'{element}')
             
     test_precedent = 0 #On vérifie la présence de la direction "précédente" dans les direction de la case en cours
-    for element in jeu[str(ctx.guild.id)+str(ctx.channel.id)].case[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement]:
+    for element in jeu[id_partie].case[jeu[id_partie].emplacement]:
         if "precedent" in element:
             test_precedent = 1
             break
             
-    for element in jeu[str(ctx.guild.id)+str(ctx.channel.id)].options:
-        try:
-            if element.startswith("v_") or element.startswith("t_") or (element != "precedent" and element != str(jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement+1) and element != jeu[str(ctx.guild.id)+str(ctx.channel.id)].nom_salle[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement]) or (element == "precedent" and test_precedent == 1):
-                await message.add_reaction(jeu[str(ctx.guild.id)+str(ctx.channel.id)].options[element])
-        except: 
-            pass #dans le cas où la réaction n'existe pas dans le scénario, suite à une erreur de l'auteur, le bot doit ignoré
-
     if avec_reaction == "ok":
-        jeu[str(ctx.guild.id)+str(ctx.channel.id)].last_reaction = element
-        for case_verifiee in jeu[str(ctx.guild.id)+str(ctx.channel.id)].case[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement]:
+        for element in jeu[id_partie].options:
+            try:
+                if element.startswith("v_") or element.startswith("t_") or (element != "precedent" and element != str(jeu[id_partie].emplacement+1) and element != jeu[id_partie].nom_salle[jeu[id_partie].emplacement]) or (element == "precedent" and test_precedent == 1):
+                    await message.add_reaction(jeu[id_partie].options[element])
+            except: 
+                pass #dans le cas où la réaction n'existe pas dans le scénario, suite à une erreur de l'auteur, le bot doit ignoré
+    
+        jeu[id_partie].last_reaction = element
+        for case_verifiee in jeu[id_partie].case[jeu[id_partie].emplacement]:
             alias = ""
             if isinstance(case_verifiee,list) is False:
                 case = str(case_verifiee)
@@ -533,76 +545,78 @@ async def envoyer_texte(ctx, texte, avec_reaction = "..."): #Convertit les liens
                     alias = case.split("->")[0]
                     case = int(case.split("->")[1]) - 1
             elif case == "precedent":
-                case = jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement_precedent
+                case = jeu[id_partie].emplacement_precedent
             else:
                     case = int(case) - 1
                     
-            if alias in jeu[str(ctx.guild.id)+str(ctx.channel.id)].alias_reaction:
-                await message.add_reaction(jeu[str(ctx.guild.id)+str(ctx.channel.id)].alias_reaction[alias])
-            elif case not in (996,997,998) and jeu[str(ctx.guild.id)+str(ctx.channel.id)].salle_react[case] != "..." and (case != jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement_precedent or (case == jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement_precedent and not ("precedent"  in jeu[str(ctx.guild.id)+str(ctx.channel.id)].options and test_precedent == 1))):
-                await message.add_reaction(jeu[str(ctx.guild.id)+str(ctx.channel.id)].salle_react[case])
+            if alias in jeu[id_partie].alias_reaction:
+                await message.add_reaction(jeu[id_partie].alias_reaction[alias])
+            elif case not in (996,997,998) and jeu[id_partie].salle_react[case] != "..." and (case != jeu[id_partie].emplacement_precedent or (case == jeu[id_partie].emplacement_precedent and not ("precedent"  in jeu[id_partie].options and test_precedent == 1))):
+                await message.add_reaction(jeu[id_partie].salle_react[case])
                 
-        if len(jeu[str(ctx.guild.id)+str(ctx.channel.id)].salle_reaction[str(jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement)]) > 0:
-            emojis = jeu[str(ctx.guild.id)+str(ctx.channel.id)].salle_reaction[str(jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement)]
+        if len(jeu[id_partie].salle_reaction[str(jeu[id_partie].emplacement)]) > 0:
+            emojis = jeu[id_partie].salle_reaction[str(jeu[id_partie].emplacement)]
             for emoji in emojis:
                 await message.add_reaction(emoji)
 
 async def verifier_objets(ctx): #Verifie les objets, variables et conditions présents dans une salle
+    id_partie = str(ctx.guild.id)+str(ctx.channel.id)
     valeur = ""
     changement = 0
-    if jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0] != "|" :
-        for o in range(jeu[str(ctx.guild.id)+str(ctx.channel.id)].nb_objets[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement]):
-            if jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][1+(o*5)] == "invisible":
-                jeu[str(ctx.guild.id)+str(ctx.channel.id)].description[jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(o*5)]] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][4+(o*5)]
-                if jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(o*5)][0] != "-" and jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(o*5)] not in jeu[str(ctx.guild.id)+str(ctx.channel.id)].inventaire_invisible:
-                    jeu[str(ctx.guild.id)+str(ctx.channel.id)].inventaire_invisible.append(jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(o*5)])
+    if jeu[id_partie].objet[jeu[id_partie].emplacement][0] != "|" :
+        for o in range(jeu[id_partie].nb_objets[jeu[id_partie].emplacement]):
+            if jeu[id_partie].objet[jeu[id_partie].emplacement][1+(o*5)] == "invisible":
+                jeu[id_partie].description[jeu[id_partie].objet[jeu[id_partie].emplacement][0+(o*5)]] = jeu[id_partie].objet[jeu[id_partie].emplacement][4+(o*5)]
+                if jeu[id_partie].objet[jeu[id_partie].emplacement][0+(o*5)][0] != "-" and jeu[id_partie].objet[jeu[id_partie].emplacement][0+(o*5)] not in jeu[id_partie].inventaire_invisible:
+                    jeu[id_partie].inventaire_invisible.append(jeu[id_partie].objet[jeu[id_partie].emplacement][0+(o*5)])
                     changement = 1
-                elif jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(o*5)][0] == "-":
-                    if jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(o*5)][1:] in jeu[str(ctx.guild.id)+str(ctx.channel.id)].inventaire_invisible:
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].inventaire_invisible.remove(jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(o*5)][1:])
+                elif jeu[id_partie].objet[jeu[id_partie].emplacement][0+(o*5)][0] == "-":
+                    if jeu[id_partie].objet[jeu[id_partie].emplacement][0+(o*5)][1:] in jeu[id_partie].inventaire_invisible:
+                        jeu[id_partie].inventaire_invisible.remove(jeu[id_partie].objet[jeu[id_partie].emplacement][0+(o*5)][1:])
                         changement = 1
-                    elif jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(o*5)][1:] in jeu[str(ctx.guild.id)+str(ctx.channel.id)].inventaire_en_cours:
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].inventaire_en_cours.remove(jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(o*5)][1:])
+                    elif jeu[id_partie].objet[jeu[id_partie].emplacement][0+(o*5)][1:] in jeu[id_partie].inventaire_en_cours:
+                        jeu[id_partie].inventaire_en_cours.remove(jeu[id_partie].objet[jeu[id_partie].emplacement][0+(o*5)][1:])
                         changement = 1
-            elif jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][1+(o*5)] == "variable":
-                jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_description[jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(o*5)]] = lire_variable(ctx, jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][4+(o*5)])
+            elif jeu[id_partie].objet[jeu[id_partie].emplacement][1+(o*5)] == "variable":
+                jeu[id_partie].variables_description[jeu[id_partie].objet[jeu[id_partie].emplacement][0+(o*5)]] = lire_variable(ctx, jeu[id_partie].objet[jeu[id_partie].emplacement][4+(o*5)])
                 try:
-                    if "%" in jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][2+(o*5)]:
-                        valeur = lire_variable(ctx, jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][2+(o*5)][2:])
+                    if "%" in jeu[id_partie].objet[jeu[id_partie].emplacement][2+(o*5)]:
+                        valeur = lire_variable(ctx, jeu[id_partie].objet[jeu[id_partie].emplacement][2+(o*5)][2:])
                         valeur = valeur.split(":")
-                        valeur = jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][2+(o*5)][1] + str(random.randint(int(valeur[0]),int(valeur[1])))
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables["resultat"] = valeur[1:]
+                        valeur = jeu[id_partie].objet[jeu[id_partie].emplacement][2+(o*5)][1] + str(random.randint(int(valeur[0]),int(valeur[1])))
+                        jeu[id_partie].variables["resultat"] = valeur[1:]
                     else:
-                        valeur = lire_variable(ctx, jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][2+(o*5)])
+                        valeur = lire_variable(ctx, jeu[id_partie].objet[jeu[id_partie].emplacement][2+(o*5)])
                     if "+" not in valeur and "-" not in valeur:
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables[jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(o*5)]] = int(valeur[1:])
+                        jeu[id_partie].variables[jeu[id_partie].objet[jeu[id_partie].emplacement][0+(o*5)]] = int(valeur[1:])
                     else:
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables[jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(o*5)]] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables[jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(o*5)]] + int(valeur)
+                        jeu[id_partie].variables[jeu[id_partie].objet[jeu[id_partie].emplacement][0+(o*5)]] = jeu[id_partie].variables[jeu[id_partie].objet[jeu[id_partie].emplacement][0+(o*5)]] + int(valeur)
                     changement = 1
                     
-                    if jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(o*5)].endswith("_o"):
-                        if jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario.startswith(url_certifiees): #si c'est une variable_o 
-                            jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario][jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(o*5)]] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables[jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(o*5)]]
+                    if jeu[id_partie].objet[jeu[id_partie].emplacement][0+(o*5)].endswith("_o"):
+                        if jeu[id_partie].id_scenario.startswith(url_certifiees): #si c'est une variable_o 
+                            jeu[id_partie].variables_online[jeu[id_partie].id_scenario][jeu[id_partie].objet[jeu[id_partie].emplacement][0+(o*5)]] = jeu[id_partie].variables[jeu[id_partie].objet[jeu[id_partie].emplacement][0+(o*5)]]
                             with open('variables_online.json', 'w') as var_o: 
-                                json.dump(jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online, var_o, indent=4)
+                                json.dump(jeu[id_partie].variables_online, var_o, indent=4)
                         
                 except:
-                    await ctx.send(f'```fix\nErreur [001] dans la variable {jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(o*5)]} et sa valeur ajoutée {lire_variable(ctx, jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][2+(o*5)])}```')
-            elif jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][1+(o*5)] == "variable_t":
-                jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_texte[jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(o*5)]] = lire_variable(ctx, jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][2+(o*5)])
-                jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_description[jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(o*5)]] = lire_variable(ctx, jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][4+(o*5)])
+                    await ctx.send(f'```fix\nErreur [001] dans la variable {jeu[id_partie].objet[jeu[id_partie].emplacement][0+(o*5)]} et sa valeur ajoutée {lire_variable(ctx, jeu[id_partie].objet[jeu[id_partie].emplacement][2+(o*5)])}```')
+            elif jeu[id_partie].objet[jeu[id_partie].emplacement][1+(o*5)] == "variable_t":
+                jeu[id_partie].variables_texte[jeu[id_partie].objet[jeu[id_partie].emplacement][0+(o*5)]] = lire_variable(ctx, jeu[id_partie].objet[jeu[id_partie].emplacement][2+(o*5)])
+                jeu[id_partie].variables_description[jeu[id_partie].objet[jeu[id_partie].emplacement][0+(o*5)]] = lire_variable(ctx, jeu[id_partie].objet[jeu[id_partie].emplacement][4+(o*5)])
                 
-                if jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(o*5)].endswith("_o"):
-                    if jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario.startswith(url_certifiees): #si c'est une variable_o 
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario][jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(o*5)]] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_texte[jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(o*5)]]
+                if jeu[id_partie].objet[jeu[id_partie].emplacement][0+(o*5)].endswith("_o"):
+                    if jeu[id_partie].id_scenario.startswith(url_certifiees): #si c'est une variable_o 
+                        jeu[id_partie].variables_online[jeu[id_partie].id_scenario][jeu[id_partie].objet[jeu[id_partie].emplacement][0+(o*5)]] = jeu[id_partie].variables_texte[jeu[id_partie].objet[jeu[id_partie].emplacement][0+(o*5)]]
                         with open('variables_online.json', 'w') as var_o: 
-                            json.dump(jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online, var_o, indent=4)
+                            json.dump(jeu[id_partie].variables_online, var_o, indent=4)
                                 
-            if jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][1+(o*5)] == "invisible" or jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][1+(o*5)] == "variable":
-                if jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][3+(o*5)] != "null" and changement == 1:
-                    await envoyer_texte(ctx,jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][3+(o*5)])
+            if jeu[id_partie].objet[jeu[id_partie].emplacement][1+(o*5)] == "invisible" or jeu[id_partie].objet[jeu[id_partie].emplacement][1+(o*5)] == "variable":
+                if jeu[id_partie].objet[jeu[id_partie].emplacement][3+(o*5)] != "null" and changement == 1:
+                    await envoyer_texte(ctx,jeu[id_partie].objet[jeu[id_partie].emplacement][3+(o*5)])
 
 async def condition_acces(ctx,case_actuelle,code="0"): #Vérifie si les conditions d'accès à une salle sont respectées
+    id_partie = str(ctx.guild.id)+str(ctx.channel.id)
     test = 2
     test_code = 0
     for objet_test in case_actuelle:  #on vérifie pour chaque objet requis et code
@@ -622,7 +636,7 @@ async def condition_acces(ctx,case_actuelle,code="0"): #Vérifie si les conditio
             elif objet_test[0] == "$":
                 test = 1
             elif objet_test[0] == '-':
-                if objet_test[1:] in jeu[str(ctx.guild.id)+str(ctx.channel.id)].inventaire_en_cours or objet_test[1:] in jeu[str(ctx.guild.id)+str(ctx.channel.id)].inventaire_invisible:
+                if objet_test[1:] in jeu[id_partie].inventaire_en_cours or objet_test[1:] in jeu[id_partie].inventaire_invisible:
                     test = 2
                     break
                 else:
@@ -719,7 +733,7 @@ async def condition_acces(ctx,case_actuelle,code="0"): #Vérifie si les conditio
                     test = 2
                     break
             else:
-                if objet_test not in jeu[str(ctx.guild.id)+str(ctx.channel.id)].inventaire_en_cours and objet_test not in jeu[str(ctx.guild.id)+str(ctx.channel.id)].inventaire_invisible:
+                if objet_test not in jeu[id_partie].inventaire_en_cours and objet_test not in jeu[id_partie].inventaire_invisible:
                     test = 2
                     break
                 else:
@@ -727,25 +741,26 @@ async def condition_acces(ctx,case_actuelle,code="0"): #Vérifie si les conditio
     return test
     
 async def executer_event(ctx,code="0",case_verifiee=[]):
+    id_partie = str(ctx.guild.id)+str(ctx.channel.id)
     nb_event = case_verifiee[2].split("@@")
     afficher_texte = 0
     for element in nb_event:
         try:
             if element.startswith("v_") and element.endswith("_v"):
-                element = str(jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables[element[2:-2]])
-                if int(element) < 1 or int(element) > len(jeu[str(ctx.guild.id)+str(ctx.channel.id)].numero) or int(element) == (jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement+1):
+                element = str(jeu[id_partie].variables[element[2:-2]])
+                if int(element) < 1 or int(element) > len(jeu[id_partie].numero) or int(element) == (jeu[id_partie].emplacement+1):
                     element = "null"
             if element.isdigit():
                 temporaire = case_verifiee[3] #on garde de coté le texte de l'event si y'a pas d'erreur
-                jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement_precedent = jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement
-                jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement = int(element)-1
+                jeu[id_partie].emplacement_precedent = jeu[id_partie].emplacement
+                jeu[id_partie].emplacement = int(element)-1
                 if temporaire != "null": #pas d'erreur (except) ni de texte null, on envoit
                     await envoyer_texte(ctx,temporaire)
-                if jeu[str(ctx.guild.id)+str(ctx.channel.id)].texte[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement] != "null":
-                    await envoyer_texte(ctx,jeu[str(ctx.guild.id)+str(ctx.channel.id)].texte[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement],avec_reaction="ok")
-                jeu[str(ctx.guild.id)+str(ctx.channel.id)].case_auto += 1
+                if jeu[id_partie].texte[jeu[id_partie].emplacement] != "null":
+                    await envoyer_texte(ctx,jeu[id_partie].texte[jeu[id_partie].emplacement],avec_reaction="ok")
+                jeu[id_partie].case_auto += 1
                 await verifier_objets(ctx)
-                if jeu[str(ctx.guild.id)+str(ctx.channel.id)].case_auto > 25:
+                if jeu[id_partie].case_auto > 25:
                     return "break"
                 await verifier_cases_speciales(ctx,code)
                 return "break"
@@ -757,52 +772,52 @@ async def executer_event(ctx,code="0",case_verifiee=[]):
                     objet_temp = element.split("&&")
 
                     if objet_temp[1] == "inventaire":
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].description[objet_temp[0]] = objet_temp[2]
-                        if objet_temp[0][0] == "-" and objet_temp[0][1:] in jeu[str(ctx.guild.id)+str(ctx.channel.id)].inventaire_en_cours:
-                            jeu[str(ctx.guild.id)+str(ctx.channel.id)].inventaire_en_cours.remove(objet_temp[0][1:])
+                        jeu[id_partie].description[objet_temp[0]] = objet_temp[2]
+                        if objet_temp[0][0] == "-" and objet_temp[0][1:] in jeu[id_partie].inventaire_en_cours:
+                            jeu[id_partie].inventaire_en_cours.remove(objet_temp[0][1:])
                             if case_verifiee[3] != "null":
                                 afficher_texte = 1
-                        elif objet_temp[0][0] != "-" and objet_temp[0] not in jeu[str(ctx.guild.id)+str(ctx.channel.id)].inventaire_en_cours:
-                            jeu[str(ctx.guild.id)+str(ctx.channel.id)].inventaire_en_cours.append(objet_temp[0])
+                        elif objet_temp[0][0] != "-" and objet_temp[0] not in jeu[id_partie].inventaire_en_cours:
+                            jeu[id_partie].inventaire_en_cours.append(objet_temp[0])
                             if case_verifiee[3] != "null":
                                 afficher_texte = 1
                         else:
                             pass  #s'il n'y a pas de changement, on ignore le 997, contrairement à !prendre qui affiche un texte
                     
                     elif objet_temp[1] == "invisible": 
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].description[objet_temp[0]] = objet_temp[2]
-                        if objet_temp[0][0] == "-" and objet_temp[0][1:] in jeu[str(ctx.guild.id)+str(ctx.channel.id)].inventaire_invisible:
-                            jeu[str(ctx.guild.id)+str(ctx.channel.id)].inventaire_invisible.remove(objet_temp[0][1:])
+                        jeu[id_partie].description[objet_temp[0]] = objet_temp[2]
+                        if objet_temp[0][0] == "-" and objet_temp[0][1:] in jeu[id_partie].inventaire_invisible:
+                            jeu[id_partie].inventaire_invisible.remove(objet_temp[0][1:])
                             if case_verifiee[3] != "null":
                                 afficher_texte = 1
-                        elif objet_temp[0][0] != "-" and objet_temp[0] not in jeu[str(ctx.guild.id)+str(ctx.channel.id)].inventaire_invisible:
-                            jeu[str(ctx.guild.id)+str(ctx.channel.id)].inventaire_invisible.append(objet_temp[0])
+                        elif objet_temp[0][0] != "-" and objet_temp[0] not in jeu[id_partie].inventaire_invisible:
+                            jeu[id_partie].inventaire_invisible.append(objet_temp[0])
                             if case_verifiee[3] != "null":
                                 afficher_texte = 1
                         else:
                             pass  #s'il n'y a pas de changement, on ignore le 997, contrairement à !prendre qui affiche un texte
                     
                     elif objet_temp[1] == "variable": 
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables[objet_temp[0]] = int(lire_variable(ctx,objet_temp[2]))
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_description[objet_temp[0]] = str(objet_temp[3])
+                        jeu[id_partie].variables[objet_temp[0]] = int(lire_variable(ctx,objet_temp[2]))
+                        jeu[id_partie].variables_description[objet_temp[0]] = str(objet_temp[3])
                         if case_verifiee[3] != "null":
                             afficher_texte = 1
                         if objet_temp[0].endswith("_o"):
-                            if jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario.startswith(url_certifiees):
-                                jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario][objet_temp[0]] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables[objet_temp[0]]
+                            if jeu[id_partie].id_scenario.startswith(url_certifiees):
+                                jeu[id_partie].variables_online[jeu[id_partie].id_scenario][objet_temp[0]] = jeu[id_partie].variables[objet_temp[0]]
                                 with open('variables_online.json', 'w') as var_o: 
-                                    json.dump(jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online, var_o, indent=4)
+                                    json.dump(jeu[id_partie].variables_online, var_o, indent=4)
                     
                     elif objet_temp[1] == "variable_t":
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_texte[objet_temp[0]] = str(objet_temp[2])
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_description[objet_temp[0]] = str(objet_temp[3])
+                        jeu[id_partie].variables_texte[objet_temp[0]] = str(objet_temp[2])
+                        jeu[id_partie].variables_description[objet_temp[0]] = str(objet_temp[3])
                         if case_verifiee[3] != "null":
                             afficher_texte = 1
                         if objet_temp[0].endswith("_o"):
-                            if jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario.startswith(url_certifiees):
-                                jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario][objet_temp[0]] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_texte[objet_temp[0]]
+                            if jeu[id_partie].id_scenario.startswith(url_certifiees):
+                                jeu[id_partie].variables_online[jeu[id_partie].id_scenario][objet_temp[0]] = jeu[id_partie].variables_texte[objet_temp[0]]
                                 with open('variables_online.json', 'w') as var_o: 
-                                    json.dump(jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online, var_o, indent=4)
+                                    json.dump(jeu[id_partie].variables_online, var_o, indent=4)
 
                 except:
                     pass
@@ -813,32 +828,32 @@ async def executer_event(ctx,code="0",case_verifiee=[]):
 
                     if variable_modifiee[0].endswith("_o"):
                         with open('variables_online.json', 'r') as var_o: 
-                            jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online = json.load(var_o)
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables[variable_modifiee[0]] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario][variable_modifiee[0]]
+                            jeu[id_partie].variables_online = json.load(var_o)
+                        jeu[id_partie].variables[variable_modifiee[0]] = jeu[id_partie].variables_online[jeu[id_partie].id_scenario][variable_modifiee[0]]
                         
                     if not isinstance(variable_modifiee[2],int):
                         variable_modifiee[2] = lire_variable(ctx, variable_modifiee[2])
-                    if variable_modifiee[0] not in jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables:   
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables[variable_modifiee[0]] = 0
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_description[variable_modifiee[0]] = "..."
+                    if variable_modifiee[0] not in jeu[id_partie].variables:   
+                        jeu[id_partie].variables[variable_modifiee[0]] = 0
+                        jeu[id_partie].variables_description[variable_modifiee[0]] = "..."
                     if "%" in variable_modifiee[2]:
                         valeur = variable_modifiee[2][1:].split(":")
                         valeur = variable_modifiee[1] + str(random.randint(int(valeur[0]),int(valeur[1])))
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables["resultat"] = valeur[1:]
+                        jeu[id_partie].variables["resultat"] = valeur[1:]
                     else:
                         valeur = variable_modifiee[1] + variable_modifiee[2]
                     if "+" not in valeur and "-" not in valeur:
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables[variable_modifiee[0]] = int(valeur[1:])
+                        jeu[id_partie].variables[variable_modifiee[0]] = int(valeur[1:])
                     else:
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables[variable_modifiee[0]] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables[variable_modifiee[0]] + int(valeur)
+                        jeu[id_partie].variables[variable_modifiee[0]] = jeu[id_partie].variables[variable_modifiee[0]] + int(valeur)
                     if case_verifiee[3] != "null":
                         afficher_texte = 1
                     
                     if variable_modifiee[0].endswith("_o"):
-                        if jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario.startswith(url_certifiees):
-                            jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario][variable_modifiee[0]] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables[variable_modifiee[0]]
+                        if jeu[id_partie].id_scenario.startswith(url_certifiees):
+                            jeu[id_partie].variables_online[jeu[id_partie].id_scenario][variable_modifiee[0]] = jeu[id_partie].variables[variable_modifiee[0]]
                             with open('variables_online.json', 'w') as var_o: 
-                                json.dump(jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online, var_o, indent=4)
+                                json.dump(jeu[id_partie].variables_online, var_o, indent=4)
 
                 except:
                     await ctx.send(f'```fix\nErreur [002] dans la variable {variable_modifiee[0]} et sa valeur ajoutée {element}```')
@@ -849,7 +864,8 @@ async def executer_event(ctx,code="0",case_verifiee=[]):
         await envoyer_texte(ctx,case_verifiee[3])
     
 async def verifier_cases_speciales(ctx,code="0"):
-    for case_verifiee in jeu[str(ctx.guild.id)+str(ctx.channel.id)].case[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement]:
+    id_partie = str(ctx.guild.id)+str(ctx.channel.id)
+    for case_verifiee in jeu[id_partie].case[jeu[id_partie].emplacement]:
         if isinstance(case_verifiee,list) is False:
             pass
         elif case_verifiee[0] == "997":
@@ -862,8 +878,8 @@ async def verifier_cases_speciales(ctx,code="0"):
             elif case_verifiee[1] == "null" or await condition_acces(ctx,case_verifiee[1],code) == 1:
                 event = await executer_event(ctx,code,case_verifiee)
                 if event == "break":
-                    if str(ctx.guild.id)+str(ctx.channel.id) in jeu:
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].case_auto = 0
+                    if id_partie in jeu:
+                        jeu[id_partie].case_auto = 0
                     break
             else:
                 pass
@@ -871,7 +887,7 @@ async def verifier_cases_speciales(ctx,code="0"):
             if case_verifiee[1] != "null":
                 await envoyer_texte(ctx,case_verifiee[1])
             await asyncio.sleep(2)
-            del jeu[str(ctx.guild.id)+str(ctx.channel.id)]
+            del jeu[id_partie]
             try: 
                 voice = get(bot.voice_clients, guild=ctx.guild)
                 if voice.is_playing():
@@ -1000,8 +1016,8 @@ async def lancer_pieces(ctx,nombre_piece: typing.Optional[int]):
 @in_channel('jdr-bot')
 async def jouer(ctx,nom_scenario="...") :
     """j!jouer choix' lance une partie avec le scenario \"choix\""""
-    global base_url
-    if str(ctx.guild.id)+str(ctx.channel.id) in jeu:
+    id_partie = str(ctx.guild.id)+str(ctx.channel.id)
+    if id_partie in jeu:
         await ctx.send(f'```fix\nUne partie est déjà en cours```')
         return 0
     elif nom_scenario == "...":
@@ -1011,7 +1027,7 @@ async def jouer(ctx,nom_scenario="...") :
     j = 2
     n = 0
 
-    jeu[str(ctx.guild.id)+str(ctx.channel.id)] = Rpg()
+    jeu[id_partie] = Rpg()
     # path = os.getcwd() + "\scenarios"; #pour test en local
     charger_url(ctx)
     
@@ -1022,11 +1038,11 @@ async def jouer(ctx,nom_scenario="...") :
         
         #à partir d'un dossier local
         # with open(os.path.join(path, nom_scenario), 'r', encoding="utf8") as data:
-            # jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario = data.readlines()
+            # jeu[id_partie].scenario = data.readlines()
         
         # à partir d'une url  
         url_actuelle = ""
-        for url in lien[str(ctx.guild.id)+str(ctx.channel.id)].url_lien: #On vérifie si le scénario existe, url par url.
+        for url in lien[id_partie].url_lien: #On vérifie si le scénario existe, url par url.
             try:
                 page = requests.get(url).text
                 soup = BeautifulSoup(page,'html.parser')
@@ -1046,14 +1062,14 @@ async def jouer(ctx,nom_scenario="...") :
                 pass
         data = urllib.request.urlopen(url_actuelle+nom_scenario).read().decode('utf-8') # utf-8 pour remote files, ANSI pour locales files
         data = data.replace("\n","/n\n").split("\n")
-        jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario = [x.replace("/n","\n") for x in data]
+        jeu[id_partie].scenario = [x.replace("/n","\n") for x in data]
         
-        jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario = url_actuelle+nom_scenario  #Version en ligne
-        # jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario = "local/" + nom_scenario  #Version en local
+        jeu[id_partie].id_scenario = url_actuelle+nom_scenario  #Version en ligne
+        # jeu[id_partie].id_scenario = "local/" + nom_scenario  #Version en local
         
     except: # gérer l'erreur : le scénario n'a pas été trouvé sur une des url ou son nom est incorrect.
         await ctx.send(f'```fix\nLe scénario : "{nom_scenario}" n\'existe pas !```')
-        del jeu[str(ctx.guild.id)+str(ctx.channel.id)]
+        del jeu[id_partie]
         return
         
     try:
@@ -1067,27 +1083,27 @@ async def jouer(ctx,nom_scenario="...") :
             await ctx.send(f'```fix\nImpossible de trouver le channel vocal \'JDR-Bot\'```')
         
         with open('variables_online.json', 'r') as var_o: 
-            jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online = json.load(var_o)
-            if jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario not in jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online:
-                jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario] = {}
+            jeu[id_partie].variables_online = json.load(var_o)
+            if jeu[id_partie].id_scenario not in jeu[id_partie].variables_online:
+                jeu[id_partie].variables_online[jeu[id_partie].id_scenario] = {}
             
-        if "nb_parties_o" in jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario]:
-            jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario]["nb_parties_o"] += 1
-            jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables["nb_parties_o"] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario]["nb_parties_o"]
+        if "nb_parties_o" in jeu[id_partie].variables_online[jeu[id_partie].id_scenario]:
+            jeu[id_partie].variables_online[jeu[id_partie].id_scenario]["nb_parties_o"] += 1
+            jeu[id_partie].variables["nb_parties_o"] = jeu[id_partie].variables_online[jeu[id_partie].id_scenario]["nb_parties_o"]
         else:
-            jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables["nb_parties_o"] = 1
-            jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario]["nb_parties_o"] = 1
-        jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_description["nb_parties_o"] = "Nombre de parties jouées"
+            jeu[id_partie].variables["nb_parties_o"] = 1
+            jeu[id_partie].variables_online[jeu[id_partie].id_scenario]["nb_parties_o"] = 1
+        jeu[id_partie].variables_description["nb_parties_o"] = "Nombre de parties jouées"
         
-        if jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario.startswith(url_certifiees):
+        if jeu[id_partie].id_scenario.startswith(url_certifiees):
             with open('variables_online.json', 'w') as var_o: 
-                json.dump(jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online, var_o, indent=4)
+                json.dump(jeu[id_partie].variables_online, var_o, indent=4)
         
-        jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario = [ligne for ligne in jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario if ligne != '\n' and ligne != '\r']
+        jeu[id_partie].scenario = [ligne for ligne in jeu[id_partie].scenario if ligne != '\n' and ligne != '\r']
         tableau_tmp = []
         tmp = ""
         
-        for ligne in jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario: #fusionne les lignes coupé par &&, et ignore les commentaires ("##")
+        for ligne in jeu[id_partie].scenario: #fusionne les lignes coupé par &&, et ignore les commentaires ("##")
             ligne = ligne.replace("\n","")
             ligne = ligne.replace("\r","")
             ligne = ligne.split("##")[0]
@@ -1099,106 +1115,106 @@ async def jouer(ctx,nom_scenario="...") :
                     tmp = ""
                 else:
                     tableau_tmp.append(ligne)
-        jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario = tableau_tmp
+        jeu[id_partie].scenario = tableau_tmp
 
-        jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[0] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[0].replace('\n',"")
-        if "|" in jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[0]:
-            temp = jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[0].split("|")
+        jeu[id_partie].scenario[0] = jeu[id_partie].scenario[0].replace('\n',"")
+        if "|" in jeu[id_partie].scenario[0]:
+            temp = jeu[id_partie].scenario[0].split("|")
             elem = 0
             for element in temp:
                 if elem == 0:
-                    jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[0] = element.replace('+n+', '\n')
+                    jeu[id_partie].scenario[0] = element.replace('+n+', '\n')
                     elem += 1
                 elif "§" in element:
                     element = element.split("§")
-                    jeu[str(ctx.guild.id)+str(ctx.channel.id)].options[element[0]] = element[1]
-                    jeu[str(ctx.guild.id)+str(ctx.channel.id)].options_inv[element[1]] = element[0]
+                    jeu[id_partie].options[element[0]] = element[1]
+                    jeu[id_partie].options_inv[element[1]] = element[0]
         
-        jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[3] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[3].rstrip().replace('+n+', '\n')
-        num_markdown = jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[1].split(" ")
+        jeu[id_partie].scenario[3] = jeu[id_partie].scenario[3].rstrip().replace('+n+', '\n')
+        num_markdown = jeu[id_partie].scenario[1].split(" ")
         if len(num_markdown) > 1:
             nombre_max = int(num_markdown[0])
-            jeu[str(ctx.guild.id)+str(ctx.channel.id)].markdown = str(num_markdown[1])+"\n"
+            jeu[id_partie].markdown = str(num_markdown[1])+"\n"
         else:
             nombre_max = int(num_markdown[0])
-            jeu[str(ctx.guild.id)+str(ctx.channel.id)].markdown = "fix\n"
+            jeu[id_partie].markdown = "fix\n"
         while i < nombre_max:  #Pour chaque case du scénario
-            jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j].split(" ")
-            jeu[str(ctx.guild.id)+str(ctx.channel.id)].numero.append(jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j][0])
-            jeu[str(ctx.guild.id)+str(ctx.channel.id)].salle_reaction[str(int(jeu[str(ctx.guild.id)+str(ctx.channel.id)].numero[i])-1)] = ""
-            if "§" in jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j][1]: #Si on a ajouter une reaction au nom de salle (avec le séparateur §)
-                jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j][1] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j][1].split("§") #on sépare nom et reaction
-                jeu[str(ctx.guild.id)+str(ctx.channel.id)].nom_salle.append(jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j][1][0]) #on récupère le nom
-                jeu[str(ctx.guild.id)+str(ctx.channel.id)].salle_react.append(jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j][1][1].replace('\n','')) #on récupère la réaction de salle
+            jeu[id_partie].scenario[i+j] = jeu[id_partie].scenario[i+j].split(" ")
+            jeu[id_partie].numero.append(jeu[id_partie].scenario[i+j][0])
+            jeu[id_partie].salle_reaction[str(int(jeu[id_partie].numero[i])-1)] = ""
+            if "§" in jeu[id_partie].scenario[i+j][1]: #Si on a ajouter une reaction au nom de salle (avec le séparateur §)
+                jeu[id_partie].scenario[i+j][1] = jeu[id_partie].scenario[i+j][1].split("§") #on sépare nom et reaction
+                jeu[id_partie].nom_salle.append(jeu[id_partie].scenario[i+j][1][0]) #on récupère le nom
+                jeu[id_partie].salle_react.append(jeu[id_partie].scenario[i+j][1][1].replace('\n','')) #on récupère la réaction de salle
             else:
-                jeu[str(ctx.guild.id)+str(ctx.channel.id)].nom_salle.append(jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j][1].replace('\n',''))
-                jeu[str(ctx.guild.id)+str(ctx.channel.id)].salle_react.append("...")
+                jeu[id_partie].nom_salle.append(jeu[id_partie].scenario[i+j][1].replace('\n',''))
+                jeu[id_partie].salle_react.append("...")
             j+=1
-            jeu[str(ctx.guild.id)+str(ctx.channel.id)].texte.append(jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j])
-            jeu[str(ctx.guild.id)+str(ctx.channel.id)].texte[i] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].texte[i].rstrip().replace('+n+', '\n')
+            jeu[id_partie].texte.append(jeu[id_partie].scenario[i+j])
+            jeu[id_partie].texte[i] = jeu[id_partie].texte[i].rstrip().replace('+n+', '\n')
             j+=1
-            if jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j].strip() == "|":
-                jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet.append(jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j].strip())
-                jeu[str(ctx.guild.id)+str(ctx.channel.id)].nb_objets.append(0)
+            if jeu[id_partie].scenario[i+j].strip() == "|":
+                jeu[id_partie].objet.append(jeu[id_partie].scenario[i+j].strip())
+                jeu[id_partie].nb_objets.append(0)
             else:   
-                jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet.append(jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j].strip().split("|"))
-                jeu[str(ctx.guild.id)+str(ctx.channel.id)].nb_objets.append(int(len(jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i])/5))
-                for o in range(jeu[str(ctx.guild.id)+str(ctx.channel.id)].nb_objets[i]):
-                    if jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][1+(o*5)] != "variable":
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][0+(o*5)] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][0+(o*5)].lower()  #On enlève les majuscule du nom, sauf si c'est une variable
-                    jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet_reaction[jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][0+(o*5)]] = ""
-                    if "§" in jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][2+(o*5)]: #On regarde si reaction dans examiner meuble
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][2+(o*5)] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][2+(o*5)].split("§")
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].meubleex_react.append(jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][2+(o*5)][1])
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet_reaction[jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][0+(o*5)]] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet_reaction[jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][0+(o*5)]] + jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][2+(o*5)][1]
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].salle_reaction[str(int(jeu[str(ctx.guild.id)+str(ctx.channel.id)].numero[i])-1)] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].salle_reaction[str(int(jeu[str(ctx.guild.id)+str(ctx.channel.id)].numero[i])-1)] + jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][2+(o*5)][1]
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][2+(o*5)] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][2+(o*5)][0]
+                jeu[id_partie].objet.append(jeu[id_partie].scenario[i+j].strip().split("|"))
+                jeu[id_partie].nb_objets.append(int(len(jeu[id_partie].objet[i])/5))
+                for o in range(jeu[id_partie].nb_objets[i]):
+                    if jeu[id_partie].objet[i][1+(o*5)] != "variable":
+                        jeu[id_partie].objet[i][0+(o*5)] = jeu[id_partie].objet[i][0+(o*5)].lower()  #On enlève les majuscule du nom, sauf si c'est une variable
+                    jeu[id_partie].objet_reaction[jeu[id_partie].objet[i][0+(o*5)]] = ""
+                    if "§" in jeu[id_partie].objet[i][2+(o*5)]: #On regarde si reaction dans examiner meuble
+                        jeu[id_partie].objet[i][2+(o*5)] = jeu[id_partie].objet[i][2+(o*5)].split("§")
+                        jeu[id_partie].meubleex_react.append(jeu[id_partie].objet[i][2+(o*5)][1])
+                        jeu[id_partie].objet_reaction[jeu[id_partie].objet[i][0+(o*5)]] = jeu[id_partie].objet_reaction[jeu[id_partie].objet[i][0+(o*5)]] + jeu[id_partie].objet[i][2+(o*5)][1]
+                        jeu[id_partie].salle_reaction[str(int(jeu[id_partie].numero[i])-1)] = jeu[id_partie].salle_reaction[str(int(jeu[id_partie].numero[i])-1)] + jeu[id_partie].objet[i][2+(o*5)][1]
+                        jeu[id_partie].objet[i][2+(o*5)] = jeu[id_partie].objet[i][2+(o*5)][0]
                     else:
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][2+(o*5)] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][2+(o*5)].replace('+n+', '\n') #description meuble
+                        jeu[id_partie].objet[i][2+(o*5)] = jeu[id_partie].objet[i][2+(o*5)].replace('+n+', '\n') #description meuble
                         
-                    if "§" in jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][3+(o*5)]: #On regarde si reaction dans prendre objet
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][3+(o*5)] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][3+(o*5)].split("§")
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].objetpr_react.append(jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][3+(o*5)][1])
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet_reaction[jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][0+(o*5)]] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet_reaction[jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][0+(o*5)]] + jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][3+(o*5)][1]
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].salle_reaction[str(int(jeu[str(ctx.guild.id)+str(ctx.channel.id)].numero[i])-1)] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].salle_reaction[str(int(jeu[str(ctx.guild.id)+str(ctx.channel.id)].numero[i])-1)] + jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][3+(o*5)][1]
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][3+(o*5)] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][3+(o*5)][0]
+                    if "§" in jeu[id_partie].objet[i][3+(o*5)]: #On regarde si reaction dans prendre objet
+                        jeu[id_partie].objet[i][3+(o*5)] = jeu[id_partie].objet[i][3+(o*5)].split("§")
+                        jeu[id_partie].objetpr_react.append(jeu[id_partie].objet[i][3+(o*5)][1])
+                        jeu[id_partie].objet_reaction[jeu[id_partie].objet[i][0+(o*5)]] = jeu[id_partie].objet_reaction[jeu[id_partie].objet[i][0+(o*5)]] + jeu[id_partie].objet[i][3+(o*5)][1]
+                        jeu[id_partie].salle_reaction[str(int(jeu[id_partie].numero[i])-1)] = jeu[id_partie].salle_reaction[str(int(jeu[id_partie].numero[i])-1)] + jeu[id_partie].objet[i][3+(o*5)][1]
+                        jeu[id_partie].objet[i][3+(o*5)] = jeu[id_partie].objet[i][3+(o*5)][0]
                     else:
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][3+(o*5)] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][3+(o*5)].replace('+n+', '\n') #prendre objet
+                        jeu[id_partie].objet[i][3+(o*5)] = jeu[id_partie].objet[i][3+(o*5)].replace('+n+', '\n') #prendre objet
                         
-                    if "§" in jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][4+(o*5)]: #On regarde si reaction dans examiner objet
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][4+(o*5)] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][4+(o*5)].split("§")
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].objetex_react.append(jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][4+(o*5)][1])
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet_reaction[jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][0+(o*5)]] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet_reaction[jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][0+(o*5)]] + jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][4+(o*5)][1]
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].salle_reaction[str(int(jeu[str(ctx.guild.id)+str(ctx.channel.id)].numero[i])-1)] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].salle_reaction[str(int(jeu[str(ctx.guild.id)+str(ctx.channel.id)].numero[i])-1)] + jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][4+(o*5)][1]
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][4+(o*5)] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][4+(o*5)][0]
+                    if "§" in jeu[id_partie].objet[i][4+(o*5)]: #On regarde si reaction dans examiner objet
+                        jeu[id_partie].objet[i][4+(o*5)] = jeu[id_partie].objet[i][4+(o*5)].split("§")
+                        jeu[id_partie].objetex_react.append(jeu[id_partie].objet[i][4+(o*5)][1])
+                        jeu[id_partie].objet_reaction[jeu[id_partie].objet[i][0+(o*5)]] = jeu[id_partie].objet_reaction[jeu[id_partie].objet[i][0+(o*5)]] + jeu[id_partie].objet[i][4+(o*5)][1]
+                        jeu[id_partie].salle_reaction[str(int(jeu[id_partie].numero[i])-1)] = jeu[id_partie].salle_reaction[str(int(jeu[id_partie].numero[i])-1)] + jeu[id_partie].objet[i][4+(o*5)][1]
+                        jeu[id_partie].objet[i][4+(o*5)] = jeu[id_partie].objet[i][4+(o*5)][0]
                     else:
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][4+(o*5)] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][4+(o*5)].replace('+n+', '\n') #description objet
+                        jeu[id_partie].objet[i][4+(o*5)] = jeu[id_partie].objet[i][4+(o*5)].replace('+n+', '\n') #description objet
 
-                    if jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][1+(o*5)] == "variable":
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables[jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][0+(o*5)]] = 0
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_description[jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][0+(o*5)]] = lire_variable(ctx, jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][4+(o*5)])
+                    if jeu[id_partie].objet[i][1+(o*5)] == "variable":
+                        jeu[id_partie].variables[jeu[id_partie].objet[i][0+(o*5)]] = 0
+                        jeu[id_partie].variables_description[jeu[id_partie].objet[i][0+(o*5)]] = lire_variable(ctx, jeu[id_partie].objet[i][4+(o*5)])
                     else:
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].description[jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][0+(o*5)]] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][4+(o*5)]
+                        jeu[id_partie].description[jeu[id_partie].objet[i][0+(o*5)]] = jeu[id_partie].objet[i][4+(o*5)]
                         
-                    jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet_reaction[jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][0+(o*5)]] = tuple(jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet_reaction[jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[i][0+(o*5)]])
+                    jeu[id_partie].objet_reaction[jeu[id_partie].objet[i][0+(o*5)]] = tuple(jeu[id_partie].objet_reaction[jeu[id_partie].objet[i][0+(o*5)]])
             j+=1
             direction=[]
-            while "*****" not in jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j]:  #Pour chaque salle explorable à partir de l'emplacement.
-                jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j].split("|")
-                if len(jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j]) == 1:  #S'il n'y a qu'un numéro de salle
-                    direction.append(jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j][0]) #numéro de salle
+            while "*****" not in jeu[id_partie].scenario[i+j]:  #Pour chaque salle explorable à partir de l'emplacement.
+                jeu[id_partie].scenario[i+j] = jeu[id_partie].scenario[i+j].split("|")
+                if len(jeu[id_partie].scenario[i+j]) == 1:  #S'il n'y a qu'un numéro de salle
+                    direction.append(jeu[id_partie].scenario[i+j][0]) #numéro de salle
                     j+=1
-                elif jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j][0] == "998" or jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j][0] == "999":
+                elif jeu[id_partie].scenario[i+j][0] == "998" or jeu[id_partie].scenario[i+j][0] == "999":
                     end = []
-                    end.append(jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j][0]) 
-                    jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j][1] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j][1].rstrip().replace('+n+', '\n')
-                    end.append(jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j][1])
+                    end.append(jeu[id_partie].scenario[i+j][0]) 
+                    jeu[id_partie].scenario[i+j][1] = jeu[id_partie].scenario[i+j][1].rstrip().replace('+n+', '\n')
+                    end.append(jeu[id_partie].scenario[i+j][1])
                     direction.append(end)
                     j+=1
                 else:
                     objet_requis = []
-                    objet_requis.append(jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j][0])  #numéro de salle
-                    objet_requis.append(jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j][1].split(" ")) #le(s) objet(s) requis   
+                    objet_requis.append(jeu[id_partie].scenario[i+j][0])  #numéro de salle
+                    objet_requis.append(jeu[id_partie].scenario[i+j][1].split(" ")) #le(s) objet(s) requis   
                     emoji = []
                     emoji.append(0)
                     emoji.append([])
@@ -1207,62 +1223,62 @@ async def jouer(ctx,nom_scenario="...") :
                         if "§" in str(objet):
                             emoji[0] = int(objet.split("§")[0])
                             emoji[1].append(objet.split("§")[1])
-                            jeu[str(ctx.guild.id)+str(ctx.channel.id)].salle_reaction[str(int(jeu[str(ctx.guild.id)+str(ctx.channel.id)].numero[i])-1)] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].salle_reaction[str(int(jeu[str(ctx.guild.id)+str(ctx.channel.id)].numero[i])-1)] + objet.split("§")[1]
-                            emoji.append(jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j][2].rstrip().replace('+n+', '\n'))
-                            emoji.append(jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j][3].rstrip().replace('+n+', '\n'))
-                            emoji.append(jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j][4].rstrip().replace('+n+', '\n'))
+                            jeu[id_partie].salle_reaction[str(int(jeu[id_partie].numero[i])-1)] = jeu[id_partie].salle_reaction[str(int(jeu[id_partie].numero[i])-1)] + objet.split("§")[1]
+                            emoji.append(jeu[id_partie].scenario[i+j][2].rstrip().replace('+n+', '\n'))
+                            emoji.append(jeu[id_partie].scenario[i+j][3].rstrip().replace('+n+', '\n'))
+                            emoji.append(jeu[id_partie].scenario[i+j][4].rstrip().replace('+n+', '\n'))
                             reaction_event = 1
                         else:
                             emoji[1].append(objet)
                     if reaction_event == 1:
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].event_react.append(emoji)
-                    jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j][2] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j][2].rstrip().replace('+n+', '\n')
-                    jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j][3] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j][3].rstrip().replace('+n+', '\n')
-                    objet_requis.append(jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j][2]) #texte si on a pas les objets ou evenement activé (997)
-                    objet_requis.append(jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[i+j][3]) #texte si on a le(s) objet(s) requis ou si l'evenement s'active.
+                        jeu[id_partie].event_react.append(emoji)
+                    jeu[id_partie].scenario[i+j][2] = jeu[id_partie].scenario[i+j][2].rstrip().replace('+n+', '\n')
+                    jeu[id_partie].scenario[i+j][3] = jeu[id_partie].scenario[i+j][3].rstrip().replace('+n+', '\n')
+                    objet_requis.append(jeu[id_partie].scenario[i+j][2]) #texte si on a pas les objets ou evenement activé (997)
+                    objet_requis.append(jeu[id_partie].scenario[i+j][3]) #texte si on a le(s) objet(s) requis ou si l'evenement s'active.
                     direction.append(objet_requis)
                     j+=1
-            jeu[str(ctx.guild.id)+str(ctx.channel.id)].case.append(direction)
-            jeu[str(ctx.guild.id)+str(ctx.channel.id)].salle_reaction[str(int(jeu[str(ctx.guild.id)+str(ctx.channel.id)].numero[i])-1)] = list(jeu[str(ctx.guild.id)+str(ctx.channel.id)].salle_reaction[str(int(jeu[str(ctx.guild.id)+str(ctx.channel.id)].numero[i])-1)])
+            jeu[id_partie].case.append(direction)
+            jeu[id_partie].salle_reaction[str(int(jeu[id_partie].numero[i])-1)] = list(jeu[id_partie].salle_reaction[str(int(jeu[id_partie].numero[i])-1)])
             i+=1
         case_actuelle = i+j
 
-        for ligne in range(case_actuelle,len(jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario)): #Pour chaque ligne après la dernière salle
-            ligne_actuelle = jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[ligne]
-            # print(jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[ligne])
+        for ligne in range(case_actuelle,len(jeu[id_partie].scenario)): #Pour chaque ligne après la dernière salle
+            ligne_actuelle = jeu[id_partie].scenario[ligne]
+            # print(jeu[id_partie].scenario[ligne])
             if "§" in ligne_actuelle: # Alors il s'agit de la ligne des alias des réactions
-                alias_react = jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[ligne].split("|")
+                alias_react = jeu[id_partie].scenario[ligne].split("|")
                 for element in alias_react:
                     if '§' in element:                                                                 
                         element = element.split("§")
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].alias_reaction[element[0]] = element[1]
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].alias_reaction_inv[element[1]] = element[0]
+                        jeu[id_partie].alias_reaction[element[0]] = element[1]
+                        jeu[id_partie].alias_reaction_inv[element[1]] = element[0]
             
             if "_o" in ligne_actuelle: #Alors il s'agit d'une variables_online (variable_o)
-                var_onl = jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[ligne].split("|")
+                var_onl = jeu[id_partie].scenario[ligne].split("|")
                 if var_onl[1].isdigit():
-                    if var_onl[0] in jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario]:
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables[var_onl[0]] = int(jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario][var_onl[0]])
+                    if var_onl[0] in jeu[id_partie].variables_online[jeu[id_partie].id_scenario]:
+                        jeu[id_partie].variables[var_onl[0]] = int(jeu[id_partie].variables_online[jeu[id_partie].id_scenario][var_onl[0]])
                     else:
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario][var_onl[0]] = int(var_onl[1])
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables[var_onl[0]] = int(var_onl[1])
+                        jeu[id_partie].variables_online[jeu[id_partie].id_scenario][var_onl[0]] = int(var_onl[1])
+                        jeu[id_partie].variables[var_onl[0]] = int(var_onl[1])
                 else:
-                    if var_onl[0] in jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario]:
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_texte[var_onl[0]] = str(jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario][var_onl[0]])
+                    if var_onl[0] in jeu[id_partie].variables_online[jeu[id_partie].id_scenario]:
+                        jeu[id_partie].variables_texte[var_onl[0]] = str(jeu[id_partie].variables_online[jeu[id_partie].id_scenario][var_onl[0]])
                     else:
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario][var_onl[0]] = str(var_onl[1])
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables[var_onl[0]] = str(var_onl[1])
-                jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_description[var_onl[0]] = var_onl[2]
+                        jeu[id_partie].variables_online[jeu[id_partie].id_scenario][var_onl[0]] = str(var_onl[1])
+                        jeu[id_partie].variables[var_onl[0]] = str(var_onl[1])
+                jeu[id_partie].variables_description[var_onl[0]] = var_onl[2]
                        
-        if jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario.startswith(url_certifiees):
+        if jeu[id_partie].id_scenario.startswith(url_certifiees):
             with open('variables_online.json', 'w') as var_o: 
-                json.dump(jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online, var_o, indent=4)
+                json.dump(jeu[id_partie].variables_online, var_o, indent=4)
                 
-        jeu[str(ctx.guild.id)+str(ctx.channel.id)].nom_salle = [x.lower() for x in jeu[str(ctx.guild.id)+str(ctx.channel.id)].nom_salle]
+        jeu[id_partie].nom_salle = [x.lower() for x in jeu[id_partie].nom_salle]
         
-        await envoyer_texte(ctx, jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[0])    
-        if jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[3] != "null":
-            await envoyer_texte(ctx, jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[3],avec_reaction="ok")
+        await envoyer_texte(ctx, jeu[id_partie].scenario[0])    
+        if jeu[id_partie].scenario[3] != "null":
+            await envoyer_texte(ctx, jeu[id_partie].scenario[3],avec_reaction="ok")
         
         await verifier_objets(ctx) #regarder si il y a des objets/conditions invisibles ou des variables
         
@@ -1271,7 +1287,7 @@ async def jouer(ctx,nom_scenario="...") :
         i = 0
     except:
             await ctx.send(f'```fix\nLe scénario : "{nom_scenario}" comporte une syntaxe incorrecte au chapitre {int(i)+1}, près de la ligne {int(i+j+1)}```')
-            del jeu[str(ctx.guild.id)+str(ctx.channel.id)]
+            del jeu[id_partie]
             try: 
                 voice = get(bot.voice_clients, guild=ctx.guild)
                 if voice.is_playing():
@@ -1285,21 +1301,22 @@ async def jouer(ctx,nom_scenario="...") :
 @in_channel('jdr-bot')
 async def avancer(ctx,choix="...",code="0") : 
     """j!avancer X Y' avance dans la pièce X avec le code Y (si y'a un code)"""
-    if str(ctx.guild.id)+str(ctx.channel.id) not in jeu:
+    id_partie = str(ctx.guild.id)+str(ctx.channel.id)
+    if id_partie not in jeu:
         await ctx.send(f'```fix\nAucune partie en cours !```')
         return
     if choix == "...":
         await ctx.send(f'```fix\nJe ne peux pas deviner où tu veux aller ... fait !avancer [numéro_ou_tu_vas] voyons !```')
         return
     if choix == "0":
-        choix = str(jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement_precedent+1)
+        choix = str(jeu[id_partie].emplacement_precedent+1)
     choix = str(choix).lower()
     test = 0
-    if choix in jeu[str(ctx.guild.id)+str(ctx.channel.id)].options.keys():
-        if choix != str(jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement+1)  and choix != jeu[str(ctx.guild.id)+str(ctx.channel.id)].nom_salle[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement]:
+    if choix in jeu[id_partie].options.keys():
+        if choix != str(jeu[id_partie].emplacement+1)  and choix != jeu[id_partie].nom_salle[jeu[id_partie].emplacement]:
             test = 1
-    if choix in jeu[str(ctx.guild.id)+str(ctx.channel.id)].nom_salle:
-        choix = jeu[str(ctx.guild.id)+str(ctx.channel.id)].nom_salle.index(choix)
+    if choix in jeu[id_partie].nom_salle:
+        choix = jeu[id_partie].nom_salle.index(choix)
         choix = str(int(choix)+1)
     
     try:
@@ -1308,7 +1325,7 @@ async def avancer(ctx,choix="...",code="0") :
         test_condition = 0
         case_testee = 0
         if test == 0:
-            for case in jeu[str(ctx.guild.id)+str(ctx.channel.id)].case[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement]:
+            for case in jeu[id_partie].case[jeu[id_partie].emplacement]:
                 if isinstance(case,list) is False and choix != "997":   # Si la case contient juste un chiffre (= numero de salle) ou "retour"
                     if "->" in case:
                         if choix == case.split("->")[0]:
@@ -1316,7 +1333,7 @@ async def avancer(ctx,choix="...",code="0") :
                             test = 1
                             test_condition = 0
                             break
-                    elif (case != "precedent" and choix == case) or (case == "precedent" and choix == str(jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement_precedent+1)): #On vérifie si c'est le numéro de salle choisis
+                    elif (case != "precedent" and choix == case) or (case == "precedent" and choix == str(jeu[id_partie].emplacement_precedent+1)): #On vérifie si c'est le numéro de salle choisis
                         test = 1
                         test_condition = 0
                         break
@@ -1330,7 +1347,7 @@ async def avancer(ctx,choix="...",code="0") :
                                 choix = case[0].split("->")[1]
                                 break     
                     else:
-                        if (case[0] != "precedent" and choix == case[0]) or (case[0] == "precedent" and choix == str(jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement_precedent+1)):
+                        if (case[0] != "precedent" and choix == case[0]) or (case[0] == "precedent" and choix == str(jeu[id_partie].emplacement_precedent+1)):
                             test = await condition_acces(ctx,case[1],code)
                             test_condition = 1
                             case_testee = i
@@ -1338,21 +1355,21 @@ async def avancer(ctx,choix="...",code="0") :
                                 break
                 i += 1
         if test == 2:
-            if jeu[str(ctx.guild.id)+str(ctx.channel.id)].case[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][case_testee][2] != "null":
-                await envoyer_texte(ctx,jeu[str(ctx.guild.id)+str(ctx.channel.id)].case[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][case_testee][2])
+            if jeu[id_partie].case[jeu[id_partie].emplacement][case_testee][2] != "null":
+                await envoyer_texte(ctx,jeu[id_partie].case[jeu[id_partie].emplacement][case_testee][2])
         if test == 1:
             if test_condition == 1:
-                if jeu[str(ctx.guild.id)+str(ctx.channel.id)].case[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][case_testee][3] != "null":
-                    await envoyer_texte(ctx,jeu[str(ctx.guild.id)+str(ctx.channel.id)].case[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][case_testee][3])
-                if "$" in jeu[str(ctx.guild.id)+str(ctx.channel.id)].case[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][case_testee][1]:
-                        jeu[str(ctx.guild.id)+str(ctx.channel.id)].case[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][case_testee] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].case[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][case_testee][0]
+                if jeu[id_partie].case[jeu[id_partie].emplacement][case_testee][3] != "null":
+                    await envoyer_texte(ctx,jeu[id_partie].case[jeu[id_partie].emplacement][case_testee][3])
+                if "$" in jeu[id_partie].case[jeu[id_partie].emplacement][case_testee][1]:
+                        jeu[id_partie].case[jeu[id_partie].emplacement][case_testee] = jeu[id_partie].case[jeu[id_partie].emplacement][case_testee][0]
                         
             try:
-                jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables["valeur"] = int(code)
-                jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement_precedent = jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement
-                jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement = int(choix)-1
-                if jeu[str(ctx.guild.id)+str(ctx.channel.id)].texte[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement] != "null":
-                    await envoyer_texte(ctx,jeu[str(ctx.guild.id)+str(ctx.channel.id)].texte[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement],avec_reaction="ok")
+                jeu[id_partie].variables["valeur"] = int(code)
+                jeu[id_partie].emplacement_precedent = jeu[id_partie].emplacement
+                jeu[id_partie].emplacement = int(choix)-1
+                if jeu[id_partie].texte[jeu[id_partie].emplacement] != "null":
+                    await envoyer_texte(ctx,jeu[id_partie].texte[jeu[id_partie].emplacement],avec_reaction="ok")
                 
                 await verifier_objets(ctx) #regarder si il y a des objets/conditions invisibles ou des variables
                 
@@ -1373,32 +1390,34 @@ async def avancer(ctx,choix="...",code="0") :
 @commands.guild_only()  
 @in_channel('jdr-bot')
 async def reculer(ctx,code="0") :
-    await avancer(ctx,str(jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement_precedent+1),code)
+    id_partie = str(ctx.guild.id)+str(ctx.channel.id)
+    await avancer(ctx,str(jeu[id_partie].emplacement_precedent+1),code)
 
 @bot.command(aliases=['pr', 'take'])
 @commands.guild_only()
 @in_channel('jdr-bot')
 async def prendre(ctx,objet_cible="...",par_reponse=0) :
     """j!prendre X' prend l'objet X"""
+    id_partie = str(ctx.guild.id)+str(ctx.channel.id)
     objet_cible = objet_cible.lower()
     i = 0
     try :
-        for o in range(jeu[str(ctx.guild.id)+str(ctx.channel.id)].nb_objets[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement]):
-            if objet_cible == jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(o*5)]: #si cible = un des objets de la pièce, cible2 = "test1" (objet) et i = n° de l'objet
+        for o in range(jeu[id_partie].nb_objets[jeu[id_partie].emplacement]):
+            if objet_cible == jeu[id_partie].objet[jeu[id_partie].emplacement][0+(o*5)]: #si cible = un des objets de la pièce, cible2 = "test1" (objet) et i = n° de l'objet
                 i = o
                 break
-        if objet_cible == jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(i*5)] and objet_cible != "null":
-            if jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][1+(i*5)] == "invisible" or jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][1+(i*5)] == "variable":
+        if objet_cible == jeu[id_partie].objet[jeu[id_partie].emplacement][0+(i*5)] and objet_cible != "null":
+            if jeu[id_partie].objet[jeu[id_partie].emplacement][1+(i*5)] == "invisible" or jeu[id_partie].objet[jeu[id_partie].emplacement][1+(i*5)] == "variable":
                 await ctx.send(f'```fix\nCe n\'est pas un objet à prendre```')
-            elif jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(i*5)] != "|" and jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(i*5)] not in jeu[str(ctx.guild.id)+str(ctx.channel.id)].inventaire_en_cours:
-                jeu[str(ctx.guild.id)+str(ctx.channel.id)].inventaire_en_cours.append(jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(i*5)])
-                jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(i*5)] = "null"
-                if jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][3+(i*5)] != "null":
-                    await envoyer_texte(ctx,jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][3+(i*5)])
-                if objet_cible in jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet_reaction.keys():
+            elif jeu[id_partie].objet[jeu[id_partie].emplacement][0+(i*5)] != "|" and jeu[id_partie].objet[jeu[id_partie].emplacement][0+(i*5)] not in jeu[id_partie].inventaire_en_cours:
+                jeu[id_partie].inventaire_en_cours.append(jeu[id_partie].objet[jeu[id_partie].emplacement][0+(i*5)])
+                jeu[id_partie].objet[jeu[id_partie].emplacement][0+(i*5)] = "null"
+                if jeu[id_partie].objet[jeu[id_partie].emplacement][3+(i*5)] != "null":
+                    await envoyer_texte(ctx,jeu[id_partie].objet[jeu[id_partie].emplacement][3+(i*5)])
+                if objet_cible in jeu[id_partie].objet_reaction.keys():
                     try:
-                        for element in jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet_reaction[objet_cible]:
-                            jeu[str(ctx.guild.id)+str(ctx.channel.id)].salle_reaction[str(jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement)].remove(element)
+                        for element in jeu[id_partie].objet_reaction[objet_cible]:
+                            jeu[id_partie].salle_reaction[str(jeu[id_partie].emplacement)].remove(element)
                     except:
                         pass    
                                 
@@ -1422,37 +1441,38 @@ async def prendre(ctx,objet_cible="...",par_reponse=0) :
 @in_channel('jdr-bot')
 async def examiner(ctx,cible="ici") :
     """j!examiner [element]' examine l'élément (endroit de la pièce, objet de la pièece ou de l'inventaire, etc.). Par défaut : examine la pièce où on se trouve."""
+    id_partie = str(ctx.guild.id)+str(ctx.channel.id)
     i = 0
     cible2 = ""
     cible = cible.lower()
     try:
-        for o in range(jeu[str(ctx.guild.id)+str(ctx.channel.id)].nb_objets[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement]):
-            if cible == jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(o*5)]: #si cible = un des objets de la pièce, cible2 = "objet" et i = n° de l'objet
+        for o in range(jeu[id_partie].nb_objets[jeu[id_partie].emplacement]):
+            if cible == jeu[id_partie].objet[jeu[id_partie].emplacement][0+(o*5)]: #si cible = un des objets de la pièce, cible2 = "objet" et i = n° de l'objet
                 cible2 = "objet"
                 i = o
                 break
-            elif cible == jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][1+(o*5)] and jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(o*5)] != "null" : #si cible = un des meubles de la pièce, cible2 = "meuble" et i = n° de l'objet
+            elif cible == jeu[id_partie].objet[jeu[id_partie].emplacement][1+(o*5)] and jeu[id_partie].objet[jeu[id_partie].emplacement][0+(o*5)] != "null" : #si cible = un des meubles de la pièce, cible2 = "meuble" et i = n° de l'objet
                 cible2 = "meuble"
                 i = o
                 break
 
         if cible == "ici":
-            await envoyer_texte(ctx, jeu[str(ctx.guild.id)+str(ctx.channel.id)].texte[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement],avec_reaction="ok") 
+            await envoyer_texte(ctx, jeu[id_partie].texte[jeu[id_partie].emplacement],avec_reaction="ok") 
         elif cible == "invisible" or cible == "variable" or cible[0] == "-" or cible == "null":
             await ctx.send(f'```fix\nC\'est impossible !```')
-        elif cible in jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables:
+        elif cible in jeu[id_partie].variables:
             if cible.endswith("_s") is False or cible == "resultat":
-                await ctx.send(f'```fix\n{cible} : {jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables[cible]}```')
-            await envoyer_texte(ctx,jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_description[cible])
-        elif cible in jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_texte:
-            await envoyer_texte(ctx,jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_texte[cible])
-            await envoyer_texte(ctx,jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_description[cible])
-        elif cible in jeu[str(ctx.guild.id)+str(ctx.channel.id)].inventaire_en_cours or cible in jeu[str(ctx.guild.id)+str(ctx.channel.id)].inventaire_invisible or cible2 == "objet":
-            await envoyer_texte(ctx,jeu[str(ctx.guild.id)+str(ctx.channel.id)].description[cible])
-        elif jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(i*5)] != "|":
+                await ctx.send(f'```fix\n{cible} : {jeu[id_partie].variables[cible]}```')
+            await envoyer_texte(ctx,jeu[id_partie].variables_description[cible])
+        elif cible in jeu[id_partie].variables_texte:
+            await envoyer_texte(ctx,jeu[id_partie].variables_texte[cible])
+            await envoyer_texte(ctx,jeu[id_partie].variables_description[cible])
+        elif cible in jeu[id_partie].inventaire_en_cours or cible in jeu[id_partie].inventaire_invisible or cible2 == "objet":
+            await envoyer_texte(ctx,jeu[id_partie].description[cible])
+        elif jeu[id_partie].objet[jeu[id_partie].emplacement][0+(i*5)] != "|":
             if cible2 == "meuble" :
-                if jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][0+(i*5)] not in jeu[str(ctx.guild.id)+str(ctx.channel.id)].inventaire_en_cours:
-                    await envoyer_texte(ctx,jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][2+(i*5)])
+                if jeu[id_partie].objet[jeu[id_partie].emplacement][0+(i*5)] not in jeu[id_partie].inventaire_en_cours:
+                    await envoyer_texte(ctx,jeu[id_partie].objet[jeu[id_partie].emplacement][2+(i*5)])
                 else:
                     await ctx.send(f'```fix\nIl n\'y a plus rien d\'intéressant ici pour l\'instant ...```')
             else: 
@@ -1468,13 +1488,14 @@ async def examiner(ctx,cible="ici") :
 @in_channel('jdr-bot')
 async def modifier(ctx, variable="...", valeur=0):
     """Affiche l'inventaire du joueur"""
+    id_partie = str(ctx.guild.id)+str(ctx.channel.id)
     try:
-        if str(ctx.guild.id)+str(ctx.channel.id) in jeu:
+        if id_partie in jeu:
             if variable == "...":
                 await ctx.send(f'```fix\nIl y a un souci dans vos arguments de commande. La commande est \'j!modifier nom_variable valeur\'```')
-            elif variable in jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables:
+            elif variable in jeu[id_partie].variables:
                 if variable.endswith("_m"):
-                    jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables[variable] = int(valeur)
+                    jeu[id_partie].variables[variable] = int(valeur)
                     await ctx.send(f'```fix\nC\'est noté, {variable} = {valeur}.```')
                     
                     await verifier_cases_speciales(ctx,code="0") #modifier une variable reverifie et redéclenche les 997 comme lors de l'entrée dans une salle.
@@ -1492,29 +1513,30 @@ async def modifier(ctx, variable="...", valeur=0):
 @commands.guild_only()
 @in_channel('jdr-bot')
 async def reponse(ctx, valeur="..."):
-    if str(ctx.guild.id)+str(ctx.channel.id) not in jeu: 
+    id_partie = str(ctx.guild.id)+str(ctx.channel.id)
+    if id_partie not in jeu: 
         await ctx.send(f'```fix\nAucune partie en cours !```')
         return
     variable_texte = ""
-    for i in range(jeu[str(ctx.guild.id)+str(ctx.channel.id)].nb_objets[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement]):
-        if jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][i*5+1] == "variable_t":
-            variable_texte = jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][i*5]
+    for i in range(jeu[id_partie].nb_objets[jeu[id_partie].emplacement]):
+        if jeu[id_partie].objet[jeu[id_partie].emplacement][i*5+1] == "variable_t":
+            variable_texte = jeu[id_partie].objet[jeu[id_partie].emplacement][i*5]
             var = i
     if valeur == "...":
         await envoyer_texte(ctx,'Veuillez indiquer une réponse : "[[PREFIX]]reponse votre_reponse"')
     elif variable_texte != "":
-        jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_texte[variable_texte] = valeur
+        jeu[id_partie].variables_texte[variable_texte] = valeur
         
         if variable_texte.endswith("_o"):
-            jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online[jeu[str(ctx.guild.id)+str(ctx.channel.id)].id_scenario][variable_texte] = jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_texte[variable_texte]
+            jeu[id_partie].variables_online[jeu[id_partie].id_scenario][variable_texte] = jeu[id_partie].variables_texte[variable_texte]
             with open('variables_online.json', 'w') as var_o: 
-                json.dump(jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_online, var_o, indent=4)
+                json.dump(jeu[id_partie].variables_online, var_o, indent=4)
         
-        await envoyer_texte(ctx,jeu[str(ctx.guild.id)+str(ctx.channel.id)].objet[jeu[str(ctx.guild.id)+str(ctx.channel.id)].emplacement][var*5+3])
+        await envoyer_texte(ctx,jeu[id_partie].objet[jeu[id_partie].emplacement][var*5+3])
         await verifier_cases_speciales(ctx,code="0")
     else:
         try:
-            jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables["reponse"] = int(valeur)
+            jeu[id_partie].variables["reponse"] = int(valeur)
             await verifier_cases_speciales(ctx,code="0")
         except:
             await prendre(ctx, str(valeur), 1)
@@ -1525,8 +1547,9 @@ async def reponse(ctx, valeur="..."):
 @in_channel('jdr-bot')
 async def scenario_en_cours(ctx):
     """Affiche le scenario en cours"""
+    id_partie = str(ctx.guild.id)+str(ctx.channel.id)
     try:
-        await ctx.send(f'```fix\nLe scénario : \"{jeu[str(ctx.guild.id)+str(ctx.channel.id)].scenario[0]}\" est en cours.```')
+        await ctx.send(f'```fix\nLe scénario : \"{jeu[id_partie].scenario[0]}\" est en cours.```')
     except:
         await ctx.send(f'```fix\nIl n\'y a pas de scénario en cours !```')
         
@@ -1535,14 +1558,15 @@ async def scenario_en_cours(ctx):
 @in_channel('jdr-bot')
 async def inventaire(ctx):
     """Affiche l'inventaire du joueur"""
-    if str(ctx.guild.id)+str(ctx.channel.id) in jeu:
+    id_partie = str(ctx.guild.id)+str(ctx.channel.id)
+    if id_partie in jeu:
         embed=discord.Embed(color=0x17B93C ,title="**Inventaire**", description="Votre inventaire contient : ")
-        for objet in jeu[str(ctx.guild.id)+str(ctx.channel.id)].inventaire_en_cours:
-            embed.add_field(name=objet, value=jeu[str(ctx.guild.id)+str(ctx.channel.id)].description[objet], inline=False)
+        for objet in jeu[id_partie].inventaire_en_cours:
+            embed.add_field(name=objet, value=jeu[id_partie].description[objet], inline=False)
         message = await ctx.send(embed=embed)
-        for element in jeu[str(ctx.guild.id)+str(ctx.channel.id)].options:
+        for element in jeu[id_partie].options:
             try:
-                await message.add_reaction(jeu[str(ctx.guild.id)+str(ctx.channel.id)].options[element])
+                await message.add_reaction(jeu[id_partie].options[element])
             except: 
                 pass #dans le cas où la réaction n'existe pas dans le scénario, suite à une erreur de l'auteur, le bot doit ignoré
     else:
@@ -1553,11 +1577,12 @@ async def inventaire(ctx):
 @in_channel('jdr-bot')     
 async def jeter(ctx,objet_jeter="???"):
     """jette un objet par terre"""
-    if str(ctx.guild.id)+str(ctx.channel.id) in jeu:
+    id_partie = str(ctx.guild.id)+str(ctx.channel.id)
+    if id_partie in jeu:
         if objet_jeter == "???":
             await ctx.send(f'```fix\nChoisissez un objet à jeter : !jeter [objet]```')
-        elif objet_jeter in jeu[str(ctx.guild.id)+str(ctx.channel.id)].inventaire_en_cours:
-            jeu[str(ctx.guild.id)+str(ctx.channel.id)].inventaire_en_cours.remove(objet_jeter)
+        elif objet_jeter in jeu[id_partie].inventaire_en_cours:
+            jeu[id_partie].inventaire_en_cours.remove(objet_jeter)
             await ctx.send(f'```fix\nVous vous débarassez de \"{objet_jeter}\"```')
         else:
             await ctx.send(f'```fix\nVous n\'avez pas \"{objet_jeter}\" dans votre inventaire.```')
@@ -1570,11 +1595,12 @@ async def jeter(ctx,objet_jeter="???"):
 @in_channel('jdr-bot')
 async def abandonner(ctx):
     """Met fin à la partie par un abandon"""
-    if str(ctx.guild.id)+str(ctx.channel.id) not in jeu:
+    id_partie = str(ctx.guild.id)+str(ctx.channel.id)
+    if id_partie not in jeu:
         await ctx.send(f'```fix\nAucune partie en cours```')
         return
     await ctx.send(f'```fix\nVous abandonnez la partie ! C\'est lâche !!!```')
-    del jeu[str(ctx.guild.id)+str(ctx.channel.id)]
+    del jeu[id_partie]
     try: 
         voice = get(bot.voice_clients, guild=ctx.guild)
         if voice.is_playing():
@@ -1588,11 +1614,12 @@ async def abandonner(ctx):
 # @in_channel('jdr-bot')
 # async def debug(ctx,texte=""):
     # """Information de debug"""
+    # id_partie = str(ctx.guild.id)+str(ctx.channel.id)
     # texte = texte.replace('+n','\n')
     # await ctx.send(f'```\n{texte}```')
-    #inventaire_invisible_bis = ', '.join(map(str, jeu[str(ctx.guild.id)+str(ctx.channel.id)].inventaire_invisible))
-    #if str(ctx.guild.id)+str(ctx.channel.id) in jeu:
-    #    await ctx.send(f'```fix\n{jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables} ET {jeu[str(ctx.guild.id)+str(ctx.channel.id)].variables_description}```')
+    #inventaire_invisible_bis = ', '.join(map(str, jeu[id_partie].inventaire_invisible))
+    #if id_partie in jeu:
+    #    await ctx.send(f'```fix\n{jeu[id_partie].variables} ET {jeu[id_partie].variables_description}```')
     #else:
     #    await ctx.send(f'```fix\nIl n\'y a pas de partie en cours !```')
 
@@ -1620,5 +1647,41 @@ async def faq(ctx):
     embed.add_field(name="**Rejoignez-nous**", value="N'hésitez pas à nous rejoindre sur le discord [Make&Play](https://discord.com/invite/Z63DtVV), spécial Créateur en tout genre et Gamers ;)", inline=False)
     await ctx.send(embed=embed)
 
+@bot.command(aliases=['statistique', 'stats','stat'])
+@commands.guild_only()
+@in_channel('jdr-bot')
+async def statistiques(ctx, lien_scenario = "..."):
+    with open('variables_online.json', 'r') as var_o: 
+        statistique_online = json.load(var_o)
+        
+    with open('prefixes.json', 'r') as f: 
+        prefixes = json.load(f)
+        
+    nb_parties = 0
+    lien_scenario = lien_scenario.lower()
+    if lien_scenario != "...":
+        if lien_scenario.endswith("/") is True:
+            lien_scenario -= "/"
+        if lien_scenario.endswith(".txt") is False:
+            lien_scenario += ".txt"
+        if lien_scenario.startswith("http") is False: #Sans url, on essaye sur celle par défaut
+            lien_scenario = "http://cyril-fiesta.fr/jdr-bot/scenarios/" + lien_scenario
+
+    if lien_scenario == "...":
+        for element in statistique_online:
+            nb_parties += statistique_online[element]["nb_parties_o"]
+        embed=discord.Embed(color=0xfe1b00 ,title="**JDR-Bot Statisques**", description="Statistiques générales de JDR-Bot")
+        embed.add_field(name="**Nombre de parties jouées depuis la version 1.6**", value=f'{nb_parties} parties', inline=False)
+        embed.add_field(name="**Connaître le nombre de parties par scénario :**", value=f'Utilisez la commande `{prefixes[str(ctx.guild.id)][0]}statistiques lien_du_scenario`\nPar exemple `{prefixes[str(ctx.guild.id)][0]}statistiques https://cyril-fiesta.fr/jdr-bot/scenarios/chateau.txt`', inline=False)
+    elif lien_scenario in statistique_online:
+        embed=discord.Embed(color=0xfe1b00 ,title="**JDR-Bot Statisques**", description=f'Statistiques de {lien_scenario}')
+        embed.add_field(name=f'**Nombre de parties jouées depuis la version 1.6**', value=f'{statistique_online[lien_scenario]["nb_parties_o"]} parties', inline=False)
+    else:
+        embed=discord.Embed(color=0xfe1b00 ,title="**JDR-Bot Statisques**", description="Lien de scénario incorrect, scénario n\'ayant pas encore été joué ou scénario ne se trouvant pas sur une des urls certifiées pour les variables onlines du bot.")
+    
+    embed.set_author(name=bot.user.name+"#"+bot.user.discriminator, icon_url=bot.user.avatar_url)
+    embed.set_thumbnail(url=bot.user.avatar_url)
+    await ctx.send(embed=embed)
+    
 #bot.loop.create_task(list_servers())
 bot.run(TOKEN)
