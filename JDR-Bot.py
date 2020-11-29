@@ -21,6 +21,7 @@ from discord.ext import commands
 from discord.voice_client import VoiceClient
 from discord.utils import get
 from discord import FFmpegPCMAudio
+from copy import deepcopy
 
 with open('config.json', 'r') as f: #token et id stocké sur un fichier externe
     config = json.load(f)
@@ -64,8 +65,9 @@ class Rpg:
         self.options_inv = {}
         self.description = {}
         self.variables = {"resultat" : 0,"valeur" : 0}
-        self.variables_description = {"resultat" : "Résultat de ... quelque chose !", "valeur" : "Valeur de ... quelque chose !", "reponse" : "Réponse à une question ..."}
-        self.variables_texte = {}
+        self.variables_description = {"resultat" : "Résultat de ... quelque chose !", "valeur" : "Valeur de ... quelque chose !", "reponse" : "Réponse à une question ...","action_cible" : "dernière cible d'une action","action_cible_ok" : "dernière cible existante d'une action"}
+        self.variables_texte = {"action_cible" : "null","action_cible_ok" : "null"}
+        self.action_custom = []
         self.nb_objets = []
         self.salle_react = []
         self.objetpr_react = []
@@ -76,6 +78,8 @@ class Rpg:
         self.salle_reaction = {} #Lie chaque réaction à la salle correspondante
         self.alias_reaction = {} #Lie chaque réaction à l'alias correspondant
         self.alias_reaction_inv = {} #Dictionnaire alias/reaction inversé pour l'utilisation des réactions
+        self.action_reaction = {} #Lie chaque reaction à l'action correspndante
+        self.action_reaction_inv = {} #Lie chaque action à la reaction correspndante
         self.last_reaction = ""
         self.case_auto = 0
         self.variables_online = {}
@@ -93,7 +97,7 @@ class Url:
 
 @bot.event
 async def on_ready():
-    activite = "JDR-Bot 1.7.1, le JDR textuel sur discord ! " + str(len(bot.guilds)) + " serveurs."
+    activite = "j!help | JDR-Bot 1.8, le JDR textuel sur discord ! " + str(len(bot.guilds)) + " serveurs."
     activity = discord.Game(name=activite)
     await bot.change_presence(activity=activity)
     servers_list = ""
@@ -122,7 +126,7 @@ async def on_ready():
 
 @bot.event
 async def on_guild_join(guild):
-    activite = "JDR-Bot 1.7, le JDR textuel sur discord ! " + str(len(bot.guilds)) + " serveurs."
+    activite = "j!help | JDR-Bot 1.8, le JDR textuel sur discord ! " + str(len(bot.guilds)) + " serveurs."
     activity = discord.Game(name=activite)
     await bot.change_presence(activity=activity)
     with open('prefixes.json', 'r') as f: 
@@ -135,7 +139,7 @@ async def on_guild_join(guild):
 
 @bot.event
 async def on_guild_remove(guild):
-    activite = "JDR-Bot 1.7, le JDR textuel sur discord ! " + str(len(bot.guilds)) + " serveurs."
+    activite = "j!help | JDR-Bot 1.8, le JDR textuel sur discord ! " + str(len(bot.guilds)) + " serveurs."
     activity = discord.Game(name=activite)
     await bot.change_presence(activity=activity)
     with open('prefixes.json', 'r') as f: 
@@ -187,6 +191,12 @@ async def on_reaction_add(reaction, user):
                 elif reaction.emoji in jeu[id_partie].alias_reaction.values():
                     jeu[id_partie].reaction_en_cours = 1
                     await avancer(ctx,jeu[id_partie].alias_reaction_inv[reaction.emoji],0)
+                    jeu[id_partie].reaction_en_cours = 0
+                
+                elif reaction.emoji in jeu[id_partie].action_reaction_inv:
+                    jeu[id_partie].reaction_en_cours = 1
+                    arguments = jeu[id_partie].action_reaction_inv[reaction.emoji].split(":")
+                    await action(ctx,arguments[0],arguments[1])
                     jeu[id_partie].reaction_en_cours = 0
                 
                 else:
@@ -267,7 +277,7 @@ async def on_command_error(ctx, error):
         if hasattr(ctx.command, 'on_error'):
             return
         
-        ignored = (commands.CommandNotFound,commands.errors.UnexpectedQuoteError,commands.errors.ExpectedClosingQuoteError, commands.UserInputError, IndexError, KeyError, discord.errors.Forbidden)
+        ignored = (commands.errors.UnexpectedQuoteError,commands.errors.ExpectedClosingQuoteError, commands.UserInputError, IndexError, KeyError, discord.errors.Forbidden)
         
         # Allows us to check for original exceptions raised and sent to CommandInvokeError.
         # If nothing is found. We keep the exception passed to on_command_error.
@@ -297,6 +307,18 @@ async def on_command_error(ctx, error):
 
         elif isinstance(error, discord.errors.HTTPException):
             return await ctx.send(f'```fix\nLe texte que vous essayez d\'afficher fait plus de 2000 caractères ou comporte une réaction inexistante sur discord.```')
+            
+        elif isinstance(error, commands.CommandNotFound):
+            id_partie = str(ctx.guild.id)+str(ctx.channel.id)
+            if id_partie not in jeu:
+                return await ctx.send(f'```fix\nCette commande n\'existe pas ou n\'est pas disponible en dehors d\'une partie```')
+            else:
+                argument = ctx.message.content[2:]
+                if " " in argument:
+                    argument = argument.split(" ")
+                    await action(ctx,argument[0], argument[1])
+                else:
+                    await action(ctx,argument)
          
         else:
             print('Ignoring exception in command {}:'.format(ctx.message.content), file=sys.stderr)
@@ -526,38 +548,44 @@ async def envoyer_texte(ctx, texte, avec_reaction = "..."): #Convertit les liens
             break
             
     if avec_reaction == "ok":
-        for element in jeu[id_partie].options:
-            try:
+        try: #au cas où une réaction n'existe pas (erreur d'un auteur), le bot peut ignoré
+            for element in jeu[id_partie].options:
                 if element.startswith("v_") or element.startswith("t_") or (element != "precedent" and element != str(jeu[id_partie].emplacement+1) and element != jeu[id_partie].nom_salle[jeu[id_partie].emplacement]) or (element == "precedent" and test_precedent == 1):
                     await message.add_reaction(jeu[id_partie].options[element])
-            except: 
-                pass #dans le cas où la réaction n'existe pas dans le scénario, suite à une erreur de l'auteur, le bot doit ignoré
-    
-        jeu[id_partie].last_reaction = element
-        for case_verifiee in jeu[id_partie].case[jeu[id_partie].emplacement]:
-            alias = ""
-            if isinstance(case_verifiee,list) is False:
-                case = str(case_verifiee)
-            else:
-                case = str(case_verifiee[0])
             
-            if "->" in case:
-                    alias = case.split("->")[0]
-                    case = int(case.split("->")[1]) - 1
-            elif case == "precedent":
-                case = jeu[id_partie].emplacement_precedent
-            else:
+            for element in jeu[id_partie].action_reaction:
+                if element.split(":")[2] == str(jeu[id_partie].emplacement+1) or element.split(":")[2] == "all":
+                    await message.add_reaction(jeu[id_partie].action_reaction[element])
+            
+            jeu[id_partie].last_reaction = element
+            for case_verifiee in jeu[id_partie].case[jeu[id_partie].emplacement]:
+                alias = ""
+                if isinstance(case_verifiee,list) is False:
+                    case = str(case_verifiee)
+                else:
+                    case = str(case_verifiee[0])
+
+                if "->" in case:
+                        alias = case.split("->")[0]
+                        case = int(case.split("->")[1]) - 1
+                elif case == "precedent":
+                    case = jeu[id_partie].emplacement_precedent
+                elif ":" in case:
+                    continue
+                else:
                     case = int(case) - 1
+                        
+                if alias in jeu[id_partie].alias_reaction:
+                    await message.add_reaction(jeu[id_partie].alias_reaction[alias])
+                elif case not in (996,997,998) and jeu[id_partie].salle_react[case] != "..." and (case != jeu[id_partie].emplacement_precedent or (case == jeu[id_partie].emplacement_precedent and not ("precedent"  in jeu[id_partie].options and test_precedent == 1))):
+                    await message.add_reaction(jeu[id_partie].salle_react[case])
                     
-            if alias in jeu[id_partie].alias_reaction:
-                await message.add_reaction(jeu[id_partie].alias_reaction[alias])
-            elif case not in (996,997,998) and jeu[id_partie].salle_react[case] != "..." and (case != jeu[id_partie].emplacement_precedent or (case == jeu[id_partie].emplacement_precedent and not ("precedent"  in jeu[id_partie].options and test_precedent == 1))):
-                await message.add_reaction(jeu[id_partie].salle_react[case])
-                
-        if len(jeu[id_partie].salle_reaction[str(jeu[id_partie].emplacement)]) > 0:
-            emojis = jeu[id_partie].salle_reaction[str(jeu[id_partie].emplacement)]
-            for emoji in emojis:
-                await message.add_reaction(emoji)
+            if len(jeu[id_partie].salle_reaction[str(jeu[id_partie].emplacement)]) > 0:
+                emojis = jeu[id_partie].salle_reaction[str(jeu[id_partie].emplacement)]
+                for emoji in emojis:
+                    await message.add_reaction(emoji)
+        except:
+            pass
 
 async def verifier_objets(ctx): #Verifie les objets, variables et conditions présents dans une salle
     id_partie = str(ctx.guild.id)+str(ctx.channel.id)
@@ -1138,6 +1166,7 @@ async def jouer(ctx,nom_scenario="...") :
         else:
             nombre_max = int(num_markdown[0])
             jeu[id_partie].markdown = "fix\n"
+            
         while i < nombre_max:  #Pour chaque case du scénario
             jeu[id_partie].scenario[i+j] = jeu[id_partie].scenario[i+j].split(" ")
             jeu[id_partie].numero.append(jeu[id_partie].scenario[i+j][0])
@@ -1166,8 +1195,8 @@ async def jouer(ctx,nom_scenario="...") :
                     if "§" in jeu[id_partie].objet[i][2+(o*5)]: #On regarde si reaction dans examiner meuble
                         jeu[id_partie].objet[i][2+(o*5)] = jeu[id_partie].objet[i][2+(o*5)].split("§")
                         jeu[id_partie].meubleex_react.append(jeu[id_partie].objet[i][2+(o*5)][1])
-                        jeu[id_partie].objet_reaction[jeu[id_partie].objet[i][0+(o*5)]] = jeu[id_partie].objet_reaction[jeu[id_partie].objet[i][0+(o*5)]] + jeu[id_partie].objet[i][2+(o*5)][1]
-                        jeu[id_partie].salle_reaction[str(int(jeu[id_partie].numero[i])-1)] = jeu[id_partie].salle_reaction[str(int(jeu[id_partie].numero[i])-1)] + jeu[id_partie].objet[i][2+(o*5)][1]
+                        jeu[id_partie].objet_reaction[jeu[id_partie].objet[i][0+(o*5)]] += jeu[id_partie].objet[i][2+(o*5)][1]
+                        jeu[id_partie].salle_reaction[str(int(jeu[id_partie].numero[i])-1)] += jeu[id_partie].objet[i][2+(o*5)][1]
                         jeu[id_partie].objet[i][2+(o*5)] = jeu[id_partie].objet[i][2+(o*5)][0]
                     else:
                         jeu[id_partie].objet[i][2+(o*5)] = jeu[id_partie].objet[i][2+(o*5)].replace('+n+', '\n') #description meuble
@@ -1175,8 +1204,8 @@ async def jouer(ctx,nom_scenario="...") :
                     if "§" in jeu[id_partie].objet[i][3+(o*5)]: #On regarde si reaction dans prendre objet
                         jeu[id_partie].objet[i][3+(o*5)] = jeu[id_partie].objet[i][3+(o*5)].split("§")
                         jeu[id_partie].objetpr_react.append(jeu[id_partie].objet[i][3+(o*5)][1])
-                        jeu[id_partie].objet_reaction[jeu[id_partie].objet[i][0+(o*5)]] = jeu[id_partie].objet_reaction[jeu[id_partie].objet[i][0+(o*5)]] + jeu[id_partie].objet[i][3+(o*5)][1]
-                        jeu[id_partie].salle_reaction[str(int(jeu[id_partie].numero[i])-1)] = jeu[id_partie].salle_reaction[str(int(jeu[id_partie].numero[i])-1)] + jeu[id_partie].objet[i][3+(o*5)][1]
+                        jeu[id_partie].objet_reaction[jeu[id_partie].objet[i][0+(o*5)]] += jeu[id_partie].objet[i][3+(o*5)][1]
+                        jeu[id_partie].salle_reaction[str(int(jeu[id_partie].numero[i])-1)] += jeu[id_partie].objet[i][3+(o*5)][1]
                         jeu[id_partie].objet[i][3+(o*5)] = jeu[id_partie].objet[i][3+(o*5)][0]
                     else:
                         jeu[id_partie].objet[i][3+(o*5)] = jeu[id_partie].objet[i][3+(o*5)].replace('+n+', '\n') #prendre objet
@@ -1184,8 +1213,8 @@ async def jouer(ctx,nom_scenario="...") :
                     if "§" in jeu[id_partie].objet[i][4+(o*5)]: #On regarde si reaction dans examiner objet
                         jeu[id_partie].objet[i][4+(o*5)] = jeu[id_partie].objet[i][4+(o*5)].split("§")
                         jeu[id_partie].objetex_react.append(jeu[id_partie].objet[i][4+(o*5)][1])
-                        jeu[id_partie].objet_reaction[jeu[id_partie].objet[i][0+(o*5)]] = jeu[id_partie].objet_reaction[jeu[id_partie].objet[i][0+(o*5)]] + jeu[id_partie].objet[i][4+(o*5)][1]
-                        jeu[id_partie].salle_reaction[str(int(jeu[id_partie].numero[i])-1)] = jeu[id_partie].salle_reaction[str(int(jeu[id_partie].numero[i])-1)] + jeu[id_partie].objet[i][4+(o*5)][1]
+                        jeu[id_partie].objet_reaction[jeu[id_partie].objet[i][0+(o*5)]] += jeu[id_partie].objet[i][4+(o*5)][1]
+                        jeu[id_partie].salle_reaction[str(int(jeu[id_partie].numero[i])-1)] += jeu[id_partie].objet[i][4+(o*5)][1]
                         jeu[id_partie].objet[i][4+(o*5)] = jeu[id_partie].objet[i][4+(o*5)][0]
                     else:
                         jeu[id_partie].objet[i][4+(o*5)] = jeu[id_partie].objet[i][4+(o*5)].replace('+n+', '\n') #description objet
@@ -1199,54 +1228,51 @@ async def jouer(ctx,nom_scenario="...") :
                     jeu[id_partie].objet_reaction[jeu[id_partie].objet[i][0+(o*5)]] = tuple(jeu[id_partie].objet_reaction[jeu[id_partie].objet[i][0+(o*5)]])
             j+=1
             direction=[]
+            
             while "*****" not in jeu[id_partie].scenario[i+j]:  #Pour chaque salle explorable à partir de l'emplacement.
-                jeu[id_partie].scenario[i+j] = jeu[id_partie].scenario[i+j].split("|")
-                if len(jeu[id_partie].scenario[i+j]) == 1:  #S'il n'y a qu'un numéro de salle
-                    direction.append(jeu[id_partie].scenario[i+j][0]) #numéro de salle
-                    j+=1
-                elif jeu[id_partie].scenario[i+j][0] == "998" or jeu[id_partie].scenario[i+j][0] == "999":
-                    end = []
-                    end.append(jeu[id_partie].scenario[i+j][0]) 
-                    jeu[id_partie].scenario[i+j][1] = jeu[id_partie].scenario[i+j][1].rstrip().replace('+n+', '\n')
-                    end.append(jeu[id_partie].scenario[i+j][1])
-                    direction.append(end)
-                    j+=1
+                ligne = jeu[id_partie].scenario[i+j].replace("+n+","\n")
+                reaction_event = 0
+                if "|" not in ligne:
+                    direction.append(ligne)
                 else:
-                    objet_requis = []
-                    objet_requis.append(jeu[id_partie].scenario[i+j][0])  #numéro de salle
-                    objet_requis.append(jeu[id_partie].scenario[i+j][1].split(" ")) #le(s) objet(s) requis   
-                    emoji = []
-                    emoji.append(0)
-                    emoji.append([])
-                    reaction_event = 0
-                    for objet in objet_requis[1]:
-                        if "§" in str(objet):
-                            emoji[0] = int(objet.split("§")[0])
-                            emoji[1].append(objet.split("§")[1])
-                            jeu[id_partie].salle_reaction[str(int(jeu[id_partie].numero[i])-1)] = jeu[id_partie].salle_reaction[str(int(jeu[id_partie].numero[i])-1)] + objet.split("§")[1]
-                            emoji.append(jeu[id_partie].scenario[i+j][2].rstrip().replace('+n+', '\n'))
-                            emoji.append(jeu[id_partie].scenario[i+j][3].rstrip().replace('+n+', '\n'))
-                            emoji.append(jeu[id_partie].scenario[i+j][4].rstrip().replace('+n+', '\n'))
-                            reaction_event = 1
-                        else:
-                            emoji[1].append(objet)
-                    if reaction_event == 1:
-                        jeu[id_partie].event_react.append(emoji)
-                    jeu[id_partie].scenario[i+j][2] = jeu[id_partie].scenario[i+j][2].rstrip().replace('+n+', '\n')
-                    jeu[id_partie].scenario[i+j][3] = jeu[id_partie].scenario[i+j][3].rstrip().replace('+n+', '\n')
-                    objet_requis.append(jeu[id_partie].scenario[i+j][2]) #texte si on a pas les objets ou evenement activé (997)
-                    objet_requis.append(jeu[id_partie].scenario[i+j][3]) #texte si on a le(s) objet(s) requis ou si l'evenement s'active.
-                    direction.append(objet_requis)
-                    j+=1
+                    ligne = ligne.split("|")
+                    if ligne[0] not in ("998","999"):
+                        ligne[1] = ligne[1].split(" ")
+                        emoji = deepcopy(ligne)
+                        for objet in emoji[1]:
+                            if "§" in objet:
+                                jeu[id_partie].salle_reaction[str(int(jeu[id_partie].numero[i])-1)] += objet.split("§")[1]
+                                if ":" not in emoji[0]:
+                                    emoji[0] = int(objet.split("§")[0])
+                                    emoji[1].append(objet.split("§")[1])
+                                    emoji[1].remove(objet)
+                                    reaction_event = 1
+                                else: #+numéro de salle pour les actions locales
+                                    jeu[id_partie].action_reaction[emoji[0]+":"+str(i+1)] = objet.split("§")[1]
+                                    jeu[id_partie].action_reaction_inv[objet.split("§")[1]] = emoji[0] + ":" + str(i+1)
+                        if reaction_event == 1:
+                            jeu[id_partie].event_react.append(emoji)        
+                    direction.append(ligne)
+                j+=1
+
             jeu[id_partie].case.append(direction)
             jeu[id_partie].salle_reaction[str(int(jeu[id_partie].numero[i])-1)] = list(jeu[id_partie].salle_reaction[str(int(jeu[id_partie].numero[i])-1)])
             i+=1
         case_actuelle = i+j
-
+        
         for ligne in range(case_actuelle,len(jeu[id_partie].scenario)): #Pour chaque ligne après la dernière salle
             ligne_actuelle = jeu[id_partie].scenario[ligne]
-            # print(jeu[id_partie].scenario[ligne])
-            if "§" in ligne_actuelle: # Alors il s'agit de la ligne des alias des réactions
+            # On regarde le premier élément d'une ligne pour déterminer son utilité
+            if ":" in ligne_actuelle.split("|")[0]: #Action custom
+                ligne_actuelle = ligne_actuelle.split("|")
+                ligne_actuelle[1] = ligne_actuelle[1].split(" ")
+                for element in ligne_actuelle[1]:
+                    if element.startswith("§"): #"+all" pour les action globales
+                        jeu[id_partie].action_reaction[ligne_actuelle[0]+":"+"all"] = element[1:]
+                        jeu[id_partie].action_reaction_inv[element[1:]] = ligne_actuelle[0] + ":" + "all"
+                jeu[id_partie].action_custom.append(ligne_actuelle)
+            
+            elif "§" in ligne_actuelle.split("|")[0]: # Alias des réactions
                 alias_react = jeu[id_partie].scenario[ligne].split("|")
                 for element in alias_react:
                     if '§' in element:                                                                 
@@ -1254,7 +1280,7 @@ async def jouer(ctx,nom_scenario="...") :
                         jeu[id_partie].alias_reaction[element[0]] = element[1]
                         jeu[id_partie].alias_reaction_inv[element[1]] = element[0]
             
-            if "_o" in ligne_actuelle: #Alors il s'agit d'une variables_online (variable_o)
+            elif "_o" in ligne_actuelle.split("|")[0]: #Variables_online (variable_o)
                 var_onl = jeu[id_partie].scenario[ligne].split("|")
                 if var_onl[1].isdigit():
                     if var_onl[0] in jeu[id_partie].variables_online[jeu[id_partie].id_scenario]:
@@ -1269,7 +1295,7 @@ async def jouer(ctx,nom_scenario="...") :
                         jeu[id_partie].variables_online[jeu[id_partie].id_scenario][var_onl[0]] = str(var_onl[1])
                         jeu[id_partie].variables[var_onl[0]] = str(var_onl[1])
                 jeu[id_partie].variables_description[var_onl[0]] = var_onl[2]
-                       
+        
         if jeu[id_partie].id_scenario.startswith(url_certifiees):
             with open('variables_online.json', 'w') as var_o: 
                 json.dump(jeu[id_partie].variables_online, var_o, indent=4)
@@ -1283,20 +1309,19 @@ async def jouer(ctx,nom_scenario="...") :
         await verifier_objets(ctx) #regarder si il y a des objets/conditions invisibles ou des variables
         
         await verifier_cases_speciales(ctx) #vérifier si il y a des cases spéciales
-        
         i = 0
     except:
-            await ctx.send(f'```fix\nLe scénario : "{nom_scenario}" comporte une syntaxe incorrecte au chapitre {int(i)+1}, près de la ligne {int(i+j+1)}```')
-            del jeu[id_partie]
-            try: 
-                voice = get(bot.voice_clients, guild=ctx.guild)
-                if voice.is_playing():
-                    voice.stop()
-                await voice.disconnect()
-            except:
-                pass
+        await ctx.send(f'```fix\nLe scénario : "{nom_scenario}" comporte une syntaxe incorrecte au chapitre {int(i)+1}, près de la ligne {int(i+j+1)}```')
+        del jeu[id_partie]
+        try: 
+            voice = get(bot.voice_clients, guild=ctx.guild)
+            if voice.is_playing():
+                voice.stop()
+            await voice.disconnect()
+        except:
+            pass
 
-@bot.command(aliases=['av', 'move', 'go', 'do', 'action'])
+@bot.command(aliases=['av', 'move', 'go'])
 @commands.guild_only()  
 @in_channel('jdr-bot')
 async def avancer(ctx,choix="...",code="0") : 
@@ -1326,7 +1351,7 @@ async def avancer(ctx,choix="...",code="0") :
         case_testee = 0
         if test == 0:
             for case in jeu[id_partie].case[jeu[id_partie].emplacement]:
-                if isinstance(case,list) is False and choix != "997":   # Si la case contient juste un chiffre (= numero de salle) ou "retour"
+                if isinstance(case,list) is False and choix != "997" and choix.startswith("action:") is False:   # Si la case contient juste un chiffre (= numero de salle) ou "retour"
                     if "->" in case:
                         if choix == case.split("->")[0]:
                             choix = case.split("->")[1]
@@ -1337,7 +1362,7 @@ async def avancer(ctx,choix="...",code="0") :
                         test = 1
                         test_condition = 0
                         break
-                elif isinstance(case,list) and choix != "997":    #autre si choix = numero
+                elif isinstance(case,list) and choix != "997" and choix.startswith("action:") is False:    #autre si choix = numero
                     if "->" in case[0]:
                         if choix == case[0].split("->")[0]:
                             test = await condition_acces(ctx,case[1],code)
@@ -1370,11 +1395,8 @@ async def avancer(ctx,choix="...",code="0") :
                 jeu[id_partie].emplacement = int(choix)-1
                 if jeu[id_partie].texte[jeu[id_partie].emplacement] != "null":
                     await envoyer_texte(ctx,jeu[id_partie].texte[jeu[id_partie].emplacement],avec_reaction="ok")
-                
                 await verifier_objets(ctx) #regarder si il y a des objets/conditions invisibles ou des variables
-                
                 await verifier_cases_speciales(ctx,code)
-                
             except ValueError: 
                 await ctx.send(f'```fix\nWarning : !Avancer [numéro] (valeur) : {code} n\'est pas une valeur numérique.```')
             
@@ -1589,6 +1611,50 @@ async def jeter(ctx,objet_jeter="???"):
     else:
         await ctx.send(f'```fix\nIl n\'y a pas de partie en cours !```')
 
+@bot.command(aliases=['act', 'faire'])
+@commands.guild_only()
+@in_channel('jdr-bot')     
+async def action(ctx,choix = "...", cible = "..."):
+    """action personnalisée"""
+    id_partie = str(ctx.guild.id)+str(ctx.channel.id)
+    try:
+        test = 0
+        texte = ""
+        action_trouvee = 0
+        if choix == "..." or cible == "...":
+            await ctx.send(f'```fix\nPrécisez l\'action et la cible```')
+        else: #On verifie d'abord les actions locales
+            jeu[id_partie].variables_texte["action_cible"] = cible
+            for case_verifiee in jeu[id_partie].case[jeu[id_partie].emplacement]:
+                if isinstance(case_verifiee,list) is True:
+                    if ":" in case_verifiee[0]:
+                        if choix == case_verifiee[0].split(":")[0] and \
+                        (cible == case_verifiee[0].split(":")[1] or case_verifiee[0].split(":")[1] == "all"):
+                            jeu[id_partie].variables_texte["action_cible_ok"] = cible
+                            test = await condition_acces(ctx,case_verifiee[1],0)
+                            action_trouvee = 1
+                            texte = case_verifiee[4]
+                            if test == 1:
+                                await executer_event(ctx,0,case_verifiee)
+                                break
+            if test != 1: #Ensuite les actions globales
+                for element in jeu[id_partie].action_custom:
+                    if choix == element[0].split(":")[0] and \
+                    (cible == element[0].split(":")[1] or element[0].split(":")[1] == "all"):
+                        jeu[id_partie].variables_texte["action_cible_ok"] = cible
+                        test = await condition_acces(ctx,element[1],0)
+                        action_trouvee = 1
+                        texte = element[4]
+                        if test == 1:
+                            await executer_event(ctx,0,element)
+                            break
+            if action_trouvee == 1 and test != 1 and texte != "null":
+                await envoyer_texte(ctx,texte)
+        if action_trouvee == 0 and choix != "..." and cible != "...":
+            await ctx.send(f'```fix\nIntéressant ... mais impossible !```')
+    except:
+        pass
+
 
 @bot.command(aliases=['ab', 'giveup'])
 @commands.guild_only()
@@ -1623,7 +1689,7 @@ async def abandonner(ctx):
     #else:
     #    await ctx.send(f'```fix\nIl n\'y a pas de partie en cours !```')
 
-@bot.command(aliases=['info','information','infos','documentation', 'doc', 'fonctionnement','botinfo','help'])
+@bot.command(aliases=['info','information','infos','documentation', 'doc', 'aide','botinfo','help'])
 async def faq(ctx):
     """information sur le bot et son auteur"""
     current_time = time.time()
