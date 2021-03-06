@@ -97,7 +97,7 @@ class Url:
 
 @bot.event
 async def on_ready():
-    activite = "j!help | JDR-Bot 1.8.2, le JDR textuel sur discord ! " + str(len(bot.guilds)) + " serveurs."
+    activite = "j!help | JDR-Bot 1.8.3, le JDR textuel sur discord ! " + str(len(bot.guilds)) + " serveurs."
     activity = discord.Game(name=activite)
     await bot.change_presence(activity=activity)
     servers_list = ""
@@ -126,7 +126,7 @@ async def on_ready():
 
 @bot.event
 async def on_guild_join(guild):
-    activite = "j!help | JDR-Bot 1.8.2, le JDR textuel sur discord ! " + str(len(bot.guilds)) + " serveurs."
+    activite = "j!help | JDR-Bot 1.8.3, le JDR textuel sur discord ! " + str(len(bot.guilds)) + " serveurs."
     activity = discord.Game(name=activite)
     await bot.change_presence(activity=activity)
     with open('prefixes.json', 'r') as f: 
@@ -139,7 +139,7 @@ async def on_guild_join(guild):
 
 @bot.event
 async def on_guild_remove(guild):
-    activite = "j!help | JDR-Bot 1.8.2, le JDR textuel sur discord ! " + str(len(bot.guilds)) + " serveurs."
+    activite = "j!help | JDR-Bot 1.8.3, le JDR textuel sur discord ! " + str(len(bot.guilds)) + " serveurs."
     activity = discord.Game(name=activite)
     await bot.change_presence(activity=activity)
     with open('prefixes.json', 'r') as f: 
@@ -485,7 +485,7 @@ def lire_variable(ctx, texte): #remplace v_variable_v par la valeur de variable
         with open('variables_online.json', 'r') as var_o: 
             jeu[id_partie].variables_online = json.load(var_o)
     for element in jeu[id_partie].variables_online[jeu[id_partie].id_scenario]:
-        if element in jeu[id_partie].variables:
+        if isinstance(jeu[id_partie].variables_online[jeu[id_partie].id_scenario][element],int):
             jeu[id_partie].variables[element] = jeu[id_partie].variables_online[jeu[id_partie].id_scenario][element]
         else:
             jeu[id_partie].variables_texte[element] = jeu[id_partie].variables_online[jeu[id_partie].id_scenario][element]
@@ -608,6 +608,7 @@ async def verifier_objets(ctx): #Verifie les objets, variables et conditions pr√
                     elif jeu[id_partie].objet[jeu[id_partie].emplacement][0+(o*5)][1:] in jeu[id_partie].inventaire_en_cours:
                         jeu[id_partie].inventaire_en_cours.remove(jeu[id_partie].objet[jeu[id_partie].emplacement][0+(o*5)][1:])
                         changement = 1
+                        
             elif jeu[id_partie].objet[jeu[id_partie].emplacement][1+(o*5)] == "variable":
                 jeu[id_partie].variables_description[jeu[id_partie].objet[jeu[id_partie].emplacement][0+(o*5)]] = lire_variable(ctx, jeu[id_partie].objet[jeu[id_partie].emplacement][4+(o*5)])
                 try:
@@ -632,6 +633,7 @@ async def verifier_objets(ctx): #Verifie les objets, variables et conditions pr√
                         
                 except:
                     await ctx.send(f'```fix\nErreur [001] dans la variable {jeu[id_partie].objet[jeu[id_partie].emplacement][0+(o*5)]} et sa valeur ajout√©e {lire_variable(ctx, jeu[id_partie].objet[jeu[id_partie].emplacement][2+(o*5)])}```')
+                    
             elif jeu[id_partie].objet[jeu[id_partie].emplacement][1+(o*5)] == "variable_t":
                 jeu[id_partie].variables_texte[jeu[id_partie].objet[jeu[id_partie].emplacement][0+(o*5)]] = lire_variable(ctx, jeu[id_partie].objet[jeu[id_partie].emplacement][2+(o*5)])
                 jeu[id_partie].variables_description[jeu[id_partie].objet[jeu[id_partie].emplacement][0+(o*5)]] = lire_variable(ctx, jeu[id_partie].objet[jeu[id_partie].emplacement][4+(o*5)])
@@ -1297,7 +1299,7 @@ async def jouer(ctx,nom_scenario="...") :
                         jeu[id_partie].variables_texte[var_onl[0]] = str(jeu[id_partie].variables_online[jeu[id_partie].id_scenario][var_onl[0]])
                     else:
                         jeu[id_partie].variables_online[jeu[id_partie].id_scenario][var_onl[0]] = str(var_onl[1])
-                        jeu[id_partie].variables[var_onl[0]] = str(var_onl[1])
+                        jeu[id_partie].variables_texte[var_onl[0]] = str(var_onl[1])
                 jeu[id_partie].variables_description[var_onl[0]] = var_onl[2]
         
         if jeu[id_partie].id_scenario.startswith(url_certifiees):
@@ -1552,7 +1554,6 @@ async def reponse(ctx, valeur="..."):
         await envoyer_texte(ctx,'Veuillez indiquer une r√©ponse : "[[PREFIX]]reponse votre_reponse"')
     elif variable_texte != "":
         jeu[id_partie].variables_texte[variable_texte] = valeur
-        
         if variable_texte.endswith("_o"):
             if jeu[id_partie].id_scenario.startswith(url_certifiees):
                 jeu[id_partie].variables_online[jeu[id_partie].id_scenario][variable_texte] = jeu[id_partie].variables_texte[variable_texte]
@@ -1659,7 +1660,6 @@ async def action(ctx,choix = "...", cible = "..."):
             await ctx.send(f'```fix\nInt√©ressant ... mais impossible !```')
     except:
         pass
-
 
 @bot.command(aliases=['ab', 'giveup'])
 @commands.guild_only()
