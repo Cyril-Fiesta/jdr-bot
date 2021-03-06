@@ -97,7 +97,7 @@ class Url:
 
 @bot.event
 async def on_ready():
-    activite = "j!help | JDR-Bot 1.8, le JDR textuel sur discord ! " + str(len(bot.guilds)) + " serveurs."
+    activite = "j!help | JDR-Bot 1.8.1, le JDR textuel sur discord ! " + str(len(bot.guilds)) + " serveurs."
     activity = discord.Game(name=activite)
     await bot.change_presence(activity=activity)
     servers_list = ""
@@ -126,7 +126,7 @@ async def on_ready():
 
 @bot.event
 async def on_guild_join(guild):
-    activite = "j!help | JDR-Bot 1.8, le JDR textuel sur discord ! " + str(len(bot.guilds)) + " serveurs."
+    activite = "j!help | JDR-Bot 1.8.1, le JDR textuel sur discord ! " + str(len(bot.guilds)) + " serveurs."
     activity = discord.Game(name=activite)
     await bot.change_presence(activity=activity)
     with open('prefixes.json', 'r') as f: 
@@ -139,7 +139,7 @@ async def on_guild_join(guild):
 
 @bot.event
 async def on_guild_remove(guild):
-    activite = "j!help | JDR-Bot 1.8, le JDR textuel sur discord ! " + str(len(bot.guilds)) + " serveurs."
+    activite = "j!help | JDR-Bot 1.8.1, le JDR textuel sur discord ! " + str(len(bot.guilds)) + " serveurs."
     activity = discord.Game(name=activite)
     await bot.change_presence(activity=activity)
     with open('prefixes.json', 'r') as f: 
@@ -479,8 +479,9 @@ async def liste_scenarios(ctx,categorie="base"):
 
 def lire_variable(ctx, texte): #remplace v_variable_v par la valeur de variable
     id_partie = str(ctx.guild.id)+str(ctx.channel.id)
-    with open('variables_online.json', 'r') as var_o: 
-        jeu[id_partie].variables_online = json.load(var_o)
+    if jeu[id_partie].id_scenario.startswith(url_certifiees):
+        with open('variables_online.json', 'r') as var_o: 
+            jeu[id_partie].variables_online = json.load(var_o)
     for element in jeu[id_partie].variables_online[jeu[id_partie].id_scenario]:
         if element in jeu[id_partie].variables:
             jeu[id_partie].variables[element] = jeu[id_partie].variables_online[jeu[id_partie].id_scenario][element]
@@ -855,9 +856,10 @@ async def executer_event(ctx,code="0",case_verifiee=[]):
                     variable_modifiee = element.split(".")
 
                     if variable_modifiee[0].endswith("_o"):
-                        with open('variables_online.json', 'r') as var_o: 
-                            jeu[id_partie].variables_online = json.load(var_o)
-                        jeu[id_partie].variables[variable_modifiee[0]] = jeu[id_partie].variables_online[jeu[id_partie].id_scenario][variable_modifiee[0]]
+                        if jeu[id_partie].id_scenario.startswith(url_certifiees):
+                            with open('variables_online.json', 'r') as var_o: 
+                                jeu[id_partie].variables_online = json.load(var_o)
+                            jeu[id_partie].variables[variable_modifiee[0]] = jeu[id_partie].variables_online[jeu[id_partie].id_scenario][variable_modifiee[0]]
                         
                     if not isinstance(variable_modifiee[2],int):
                         variable_modifiee[2] = lire_variable(ctx, variable_modifiee[2])
@@ -1109,11 +1111,11 @@ async def jouer(ctx,nom_scenario="...") :
             await ctx.send(f'```fix\nImpossible de rejoindre le channel vocal \'JDR-Bot\'```')
         except:
             await ctx.send(f'```fix\nImpossible de trouver le channel vocal \'JDR-Bot\'```')
-        
-        with open('variables_online.json', 'r') as var_o: 
-            jeu[id_partie].variables_online = json.load(var_o)
-            if jeu[id_partie].id_scenario not in jeu[id_partie].variables_online:
-                jeu[id_partie].variables_online[jeu[id_partie].id_scenario] = {}
+        if jeu[id_partie].id_scenario.startswith(url_certifiees):
+            with open('variables_online.json', 'r') as var_o: 
+                jeu[id_partie].variables_online = json.load(var_o)
+        if jeu[id_partie].id_scenario not in jeu[id_partie].variables_online:
+            jeu[id_partie].variables_online[jeu[id_partie].id_scenario] = {}
             
         if "nb_parties_o" in jeu[id_partie].variables_online[jeu[id_partie].id_scenario]:
             jeu[id_partie].variables_online[jeu[id_partie].id_scenario]["nb_parties_o"] += 1
@@ -1550,9 +1552,10 @@ async def reponse(ctx, valeur="..."):
         jeu[id_partie].variables_texte[variable_texte] = valeur
         
         if variable_texte.endswith("_o"):
-            jeu[id_partie].variables_online[jeu[id_partie].id_scenario][variable_texte] = jeu[id_partie].variables_texte[variable_texte]
-            with open('variables_online.json', 'w') as var_o: 
-                json.dump(jeu[id_partie].variables_online, var_o, indent=4)
+            if jeu[id_partie].id_scenario.startswith(url_certifiees):
+                jeu[id_partie].variables_online[jeu[id_partie].id_scenario][variable_texte] = jeu[id_partie].variables_texte[variable_texte]
+                with open('variables_online.json', 'w') as var_o: 
+                    json.dump(jeu[id_partie].variables_online, var_o, indent=4)
         
         await envoyer_texte(ctx,jeu[id_partie].objet[jeu[id_partie].emplacement][var*5+3])
         await verifier_cases_speciales(ctx,code="0")
@@ -1690,6 +1693,8 @@ async def abandonner(ctx):
     #    await ctx.send(f'```fix\nIl n\'y a pas de partie en cours !```')
 
 @bot.command(aliases=['info','information','infos','documentation', 'doc', 'aide','botinfo','help'])
+@commands.guild_only() 
+@in_channel('jdr-bot')
 async def faq(ctx):
     """information sur le bot et son auteur"""
     current_time = time.time()
