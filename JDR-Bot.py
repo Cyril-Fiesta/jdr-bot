@@ -97,7 +97,7 @@ class Url:
 
 @bot.event
 async def on_ready():
-    activite = "j!help | JDR-Bot 1.8.1, le JDR textuel sur discord ! " + str(len(bot.guilds)) + " serveurs."
+    activite = "j!help | JDR-Bot 1.8.2, le JDR textuel sur discord ! " + str(len(bot.guilds)) + " serveurs."
     activity = discord.Game(name=activite)
     await bot.change_presence(activity=activity)
     servers_list = ""
@@ -126,7 +126,7 @@ async def on_ready():
 
 @bot.event
 async def on_guild_join(guild):
-    activite = "j!help | JDR-Bot 1.8.1, le JDR textuel sur discord ! " + str(len(bot.guilds)) + " serveurs."
+    activite = "j!help | JDR-Bot 1.8.2, le JDR textuel sur discord ! " + str(len(bot.guilds)) + " serveurs."
     activity = discord.Game(name=activite)
     await bot.change_presence(activity=activity)
     with open('prefixes.json', 'r') as f: 
@@ -139,7 +139,7 @@ async def on_guild_join(guild):
 
 @bot.event
 async def on_guild_remove(guild):
-    activite = "j!help | JDR-Bot 1.8.1, le JDR textuel sur discord ! " + str(len(bot.guilds)) + " serveurs."
+    activite = "j!help | JDR-Bot 1.8.2, le JDR textuel sur discord ! " + str(len(bot.guilds)) + " serveurs."
     activity = discord.Game(name=activite)
     await bot.change_presence(activity=activity)
     with open('prefixes.json', 'r') as f: 
@@ -153,8 +153,9 @@ async def on_guild_remove(guild):
 @bot.event
 async def on_reaction_add(reaction, user):
     ctx = await bot.get_context(reaction.message)
-    id_partie = str(reaction.message.guild.id)+str(reaction.message.channel.id)
-    if str(user) == "JDR-Bot#5773":
+    if reaction.message.guild:
+        id_partie = str(reaction.message.guild.id)+str(reaction.message.channel.id)
+    if str(user) == "JDR-Bot#5773" or not reaction.message.guild:
         pass
     elif id_partie not in jeu and "jdr-bot" in reaction.message.channel.name and reaction.emoji in categories_scenarios:
         await liste_scenarios(ctx,categories_scenarios[reaction.emoji])
@@ -309,16 +310,17 @@ async def on_command_error(ctx, error):
             return await ctx.send(f'```fix\nLe texte que vous essayez d\'afficher fait plus de 2000 caractères ou comporte une réaction inexistante sur discord.```')
             
         elif isinstance(error, commands.CommandNotFound):
-            id_partie = str(ctx.guild.id)+str(ctx.channel.id)
-            if id_partie not in jeu:
-                return await ctx.send(f'```fix\nCette commande n\'existe pas ou n\'est pas disponible en dehors d\'une partie```')
-            else:
-                argument = ctx.message.content[2:]
-                if " " in argument:
-                    argument = argument.split(" ")
-                    await action(ctx,argument[0], argument[1])
+            if ctx.channel.permissions_for(ctx.me).send_messages:
+                id_partie = str(ctx.guild.id)+str(ctx.channel.id)
+                if id_partie not in jeu:
+                    return await ctx.send(f'```fix\nCette commande n\'existe pas ou n\'est pas disponible en dehors d\'une partie```')
                 else:
-                    await action(ctx,argument)
+                    argument = ctx.message.content[2:]
+                    if " " in argument:
+                        argument = argument.split(" ")
+                        await action(ctx,argument[0], argument[1])
+                    else:
+                        await action(ctx,argument)
          
         else:
             print('Ignoring exception in command {}:'.format(ctx.message.content), file=sys.stderr)
